@@ -17,8 +17,8 @@ ${usedPrefix + command} 1000`.trim()
     let credit = users.credit
     let amount = (args[0] && number(parseInt(args[0])) ? Math.max(parseInt(args[0]), 1) : /all/i.test(args[0]) ? Math.floor(parseInt(users.credit)) : 1) * 1
 
-    let time = users.lastcf + 90000
-        if (new Date - users.lastcf < 90000) throw `يمكنك القتال مجددا بعد ${msToTime(time - new Date())}`
+    let time = users.lastcf + 3600000 // ساعة واحدة بدلاً من 90 ثانية
+if (new Date - users.lastcf < 3600000) throw `يمكنك القتال مجددا بعد ${msToTime(time - new Date())}`
         if (amount < 100) throw `🟥 *لا يمكنك الرهان ب أقل من 100*`
         if (users.credit < amount) throw `🟥 *لا تملك نقود كافية* \n *لديك فقط ${credit} عمله.*`
         if (users.chicken < 1) {
