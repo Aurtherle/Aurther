@@ -14,7 +14,7 @@ let handler = async (m, { conn, command, args, usedPrefix }) => {
 
 handler.help = ['buych']
 handler.tags = ['economy']
-handler.command = ['دجاج'] 
+///handler.command = ['دجاج'] 
 
 handler.group = true
 
