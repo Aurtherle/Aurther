@@ -48,7 +48,7 @@ if (new Date - users.lastcf < 3600000) throw `يمكنك القتال مجددا
 
 handler.help = ['cock-fight <amount>']
 handler.tags = ['economy']
-handler.command = ['قتال', 'cf']
+///handler.command = ['قتال', 'cf']
 
 handler.group = true
 
