@@ -15,5 +15,6 @@ handler.tags = ['group']
 handler.command = /^del(ete)?$/i
 handler.group = false
 handler.botAdmin = true
+handler.admin = true
 
 export default handler
