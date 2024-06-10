@@ -19,8 +19,12 @@ let قلوب = {
   questionsRemaining: 3 // تم تحديد عدد الأسئلة بـ 3
 };
 
-// قراءة البيانات من ملف JSON
-let acertijoData = JSON.parse(fs.readFileSync('./src/game/acertijo.json'));
+// جلب البيانات من ملف JSON
+const fetchData = async () => {
+  const response = await fetch('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
+  const data = await response.json();
+  return data;
+};
 
 // دالة للمساعدة في إنشاء رد
 let توثيق = (m) => {
@@ -49,8 +53,9 @@ let sendNewQuestion = async (conn, m) => {
     return;
   }
 
+  let acertijoData = await fetchData();
   قلوب.currentQuestion = acertijoData[Math.floor(Math.random() * acertijoData.length)];
-  let message = await conn.sendMessage(m.chat, { image: { url: قلوب.currentQuestion.رابط }, caption: 'سؤال جديد!' });
+  let message = await conn.sendMessage(m.chat, { image: { url: قلوب.currentQuestion.img }, caption: 'سؤال جديد!' });
   قلوب.questionsRemaining--;
 
   قلوب.currentQuestion.messageId = message.key.id; // حفظ معرف الرسالة
@@ -182,7 +187,7 @@ const before = async (m, { conn }) => {
   // التحقق من أن الرسالة المقتبسة هي الرسالة الصحيحة
   if (قلوب.currentQuestion && m.quoted.id === قلوب.currentQuestion.messageId) {
     let answeringPlayer = m.sender.split('@')[0];
-    let correctAnswer = قلوب.currentQuestion.جواب.toLowerCase().trim();
+    let correctAnswer = قلوب.currentQuestion.name.toLowerCase().trim(); // Use 'name' as the correct answer field
     let playerAnswer = m.text.toLowerCase().trim();
 
     // التحقق من الإجابة الصحيحة
