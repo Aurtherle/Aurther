@@ -1,6 +1,7 @@
 import { createRequire } from 'module';
 import fetch from 'node-fetch';
 const require = createRequire(import.meta.url);
+const fs = require('fs');
 import similarity from 'similarity';
 
 const threshold = 0.72;
@@ -218,6 +219,9 @@ const before = async (m, { conn }) => {
 
   return true;
 }
+
+handler.command = /^(قلوب|مشاركة|بدأ|انقاص|نتيجه|انتهاء)$/i;
+handler.botAdmin = true;
 
 export default handler;
 export { before };
