@@ -12,6 +12,7 @@ let handler = async (m, { conn, command, args }) => {
     async function fetchData() {
         try {
             let response = await axios.get('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
+            console.log("Data fetched:", response.data); // Log fetched data
             return response.data;
         } catch (error) {
             console.error("Failed to fetch data:", error);
