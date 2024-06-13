@@ -48,10 +48,21 @@ let handler = async (m, { conn, command, args }) => {
 
     // Function to start the round
     async function startRound() {
-        if (!chat.inGame) return; // If no game is in progress, ignore the start command
-        if (chat.allowJoining) return; // If joining is still allowed, ignore the start command
+        if (!chat.inGame) {
+            console.log("No game in progress.");
+            return; // If no game is in progress, ignore the start command
+        }
+        if (chat.allowJoining) {
+            console.log("Joining is still allowed.");
+            return; // If joining is still allowed, ignore the start command
+        }
 
         let data = await fetchData();
+        if (data.length === 0) {
+            await conn.reply(m.chat, "Failed to fetch questions. Please try again later.", m);
+            return;
+        }
+
         let shuffledData = shuffleArray(data);
         chat.currentQuestion = shuffledData[0];
         chat.currentAnswer = chat.currentQuestion.name.toLowerCase().replace(/\s/g, '');
