@@ -1,6 +1,7 @@
 import { createRequire } from 'module';
 import fetch from 'node-fetch';
 const require = createRequire(import.meta.url);
+const fs = require('fs');
 import similarity from 'similarity';
 
 const threshold = 0.72;
@@ -197,4 +198,31 @@ const before = async (m, { conn }) => {
     } else {
       // تقليل القلب إذا كانت الإجابة خاطئة
       if (قلوب.players[answeringPlayer]) {
-        قلوب.players[answeringPlayer].he
+        قلوب.players[answeringPlayer].hearts--;
+        if (قلوب.players[answeringPlayer].hearts <= 0) {
+          delete قلوب.players[answeringPlayer];
+          m.reply(`خصر اللاعب @${answeringPlayer}`);
+        } else {
+          m.reply(`إجابة خاطئة! تم تقليل قلب واحد من @${answeringPlayer}. القلوب المتبقية: ${قلوب.players[answeringPlayer].icon.repeat(قلوب.players[answeringPlayer].hearts)}`);
+        }
+      }
+    }
+
+    // التحقق إذا كان هناك لاعب واحد فقط متبقي
+    if (Object.keys(قلوب.players).length === 1) {
+      let remainingPlayer = Object.keys(قلوب.players)[0];
+      m.reply(`اللعبة انتهت! الفائز هو @${remainingPlayer}`);
+      قلوب.isActive = false;
+      if (قلوب.timer) clearTimeout(قلوب.timer);
+    }
+  }
+
+  return true;
+}
+
+// تعيين الأوامر
+handler.command = /^(قلوب|مشاركة|بدأ|انقاص|نتيجه|انتهاء)$/i;
+
+handler.botAdmin = true;
+
+export default handler;
