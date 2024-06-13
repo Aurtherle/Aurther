@@ -63,7 +63,7 @@ let handler = async (m, { conn, command, args }) => {
 
         let shuffledData = shuffleArray(data);
         chat.currentQuestion = shuffledData[0];
-        chat.currentAnswer = chat.currentQuestion.name.toLowerCase().replace(/\s/g, '');
+        chat.currentAnswer = chat.currentQuestion.name.trim().toLowerCase().replace(/\s/g, '');
         chat.currentImg = chat.currentQuestion.img;
 
         console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`); // Log the current question details
@@ -75,7 +75,7 @@ let handler = async (m, { conn, command, args }) => {
     async function handleAnswer(user, message) {
         if (!chat.inGame || !chat.currentAnswer) return; // If no game or no current question, ignore the message
 
-        let answer = message.toLowerCase().replace(/\s/g, '');
+        let answer = message.trim().toLowerCase().replace(/\s/g, '');
         console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`); // Log the answers for debugging
 
         if (answer === chat.currentAnswer) {
