@@ -27,7 +27,7 @@ let handler = async (m, { conn, command, args }) => {
         chat.allowJoining = true;
         chat.players = {}; // Reset player data
 
-        await conn.reply(m.chat, "The game has started! Type 'join' to participate. Type 'stopjoin' to stop joining. Type 'start' to begin the round.", m);
+        await conn.reply(m.chat, "The game has started! Type 'join' to participate. Type 'start' to begin the round.", m);
     }
 
     // Function to handle player joining
@@ -40,22 +40,14 @@ let handler = async (m, { conn, command, args }) => {
         }
     }
 
-    // Function to stop joining
-    async function stopJoining() {
-        chat.allowJoining = false;
-        await conn.reply(m.chat, "Joining has been stopped. Type 'start' to begin the round.", m);
-    }
-
     // Function to start the round
     async function startRound() {
         if (!chat.inGame) {
             console.log("No game in progress.");
             return; // If no game is in progress, ignore the start command
         }
-        if (chat.allowJoining) {
-            console.log("Joining is still allowed.");
-            return; // If joining is still allowed, ignore the start command
-        }
+
+        chat.allowJoining = false; // Stop allowing new players to join
 
         let data = await fetchData();
         if (data.length === 0) {
@@ -133,8 +125,6 @@ let handler = async (m, { conn, command, args }) => {
         await startGame();
     } else if (/^join$/i.test(command)) {
         await joinGame(m.sender);
-    } else if (/^stopjoin$/i.test(command)) {
-        await stopJoining();
     } else if (/^start$/i.test(command)) {
         await startRound();
     } else if (/^takeheart$/i.test(command)) {
@@ -147,6 +137,6 @@ let handler = async (m, { conn, command, args }) => {
     }
 };
 
-handler.command = /^(hearts|join|stopjoin|start|takeheart|end)$/i;
+handler.command = /^(hearts|join|start|takeheart|end)$/i;
 
 export default handler;
