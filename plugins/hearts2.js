@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-let handler = async (m, { conn, args }) => {
+let handler = async (m, { conn, command, args }) => {
     let chat = global.db.data.chats[m.chat];
     chat.players = chat.players || {}; // To store player data
     chat.inGame = chat.inGame || false; // To check if the game is in progress
@@ -118,21 +118,21 @@ let handler = async (m, { conn, args }) => {
     }
 
     // Command handler
-    if (args[0] === 'hearts') {
-        startGame();
-    } else if (args[0] === 'join') {
-        joinGame(m.sender);
-    } else if (args[0] === 'stopjoin') {
-        stopJoining();
-    } else if (args[0] === 'start') {
-        startRound();
-    } else if (args[0] === 'takeheart') {
-        let toUser = args[1]; // Assuming the command is 'takeheart @user'
-        takeHeart(m.sender, toUser);
-    } else if (args[0] === 'end') {
-        endGame();
+    if (/^hearts$/i.test(command)) {
+        await startGame();
+    } else if (/^join$/i.test(command)) {
+        await joinGame(m.sender);
+    } else if (/^stopjoin$/i.test(command)) {
+        await stopJoining();
+    } else if (/^start$/i.test(command)) {
+        await startRound();
+    } else if (/^takeheart$/i.test(command)) {
+        let toUser = args[0]; // Assuming the command is 'takeheart @user'
+        await takeHeart(m.sender, toUser);
+    } else if (/^end$/i.test(command)) {
+        await endGame();
     } else {
-        handleAnswer(m.sender, m.text);
+        await handleAnswer(m.sender, m.text);
     }
 };
 
