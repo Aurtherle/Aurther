@@ -139,7 +139,7 @@ let handler = async (m, { conn, command, args }) => {
         await startGame();
     } else if (/^join$/i.test(command)) {
         await joinGame(m.sender);
-    } else if (/^start$/i.test(command)) {
+    } else if (/^startr$/i.test(command)) {
         await startRound();
     } else if (/^takeheart$/i.test(command)) {
         let toUser = args[0]; // Assuming the command is 'takeheart @user'
@@ -151,6 +151,6 @@ let handler = async (m, { conn, command, args }) => {
     }
 };
 
-handler.command = /^(hearts|join|start|takeheart|end)$/i;
+handler.command = /^(hearts|join|startr|takeheart|end)$/i;
 
 export default handler;
