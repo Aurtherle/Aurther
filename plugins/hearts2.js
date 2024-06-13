@@ -60,6 +60,8 @@ let handler = async (m, { conn, command, args }) => {
         chat.currentAnswer = chat.currentQuestion.name.toLowerCase().replace(/\s/g, '');
         chat.currentImg = chat.currentQuestion.img;
 
+        console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`); // Log the current question details
+
         await conn.reply(m.chat, { image: { url: chat.currentImg }, caption: "Guess the anime!" }, m);
     }
 
