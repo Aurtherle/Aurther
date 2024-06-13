@@ -12,7 +12,6 @@ let handler = async (m, { conn, command, args }) => {
     async function fetchData() {
         try {
             let response = await axios.get('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
-            console.log("Data fetched successfully.");
             return response.data;
         } catch (error) {
             console.error("Failed to fetch data:", error);
@@ -23,8 +22,8 @@ let handler = async (m, { conn, command, args }) => {
     // Function to start the game
     async function startGame() {
         if (chat.inGame) {
-            await conn.reply(m.chat, "A game is already in progress. Please wait for it to end.", m);
-            return;
+            await conn.reply(m.chat, "A game is already in progress.", m);
+            return; // If a game is already in progress, ignore the start command
         }
 
         chat.inGame = true;
@@ -37,8 +36,8 @@ let handler = async (m, { conn, command, args }) => {
     // Function to handle player joining
     async function joinGame(user) {
         if (!chat.allowJoining) {
-            await conn.reply(m.chat, "Joining is currently not allowed. Please wait for the round to start.", m);
-            return;
+            await conn.reply(m.chat, "Joining is not allowed at this moment.", m);
+            return; // If joining is not allowed, ignore the join command
         }
 
         if (!chat.players[user]) {
@@ -50,9 +49,8 @@ let handler = async (m, { conn, command, args }) => {
     // Function to start the round
     async function startRound() {
         if (!chat.inGame) {
-            console.log("No game in progress.");
-            await conn.reply(m.chat, "No game is in progress. Use 'hearts' to start a new game.", m);
-            return;
+            await conn.reply(m.chat, "No game in progress. Start a game first using the 'hearts' command.", m);
+            return; // If no game is in progress, ignore the start command
         }
 
         chat.allowJoining = false; // Stop allowing new players to join
@@ -70,7 +68,7 @@ let handler = async (m, { conn, command, args }) => {
 
         console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`); // Log the current question details
 
-        await conn.reply(m.chat, { image: { url: chat.currentImg }, caption: "Guess the anime!" }, m);
+        await conn.sendMessage(m.chat, { image: { url: chat.currentImg }, caption: "Guess the anime!" });
     }
 
     // Function to handle player answer
@@ -81,16 +79,12 @@ let handler = async (m, { conn, command, args }) => {
         if (answer === chat.currentAnswer) {
             await conn.reply(m.chat, `${user} got it right! Type 'takeheart @user' to take a heart from another player.`, m);
             chat.currentAnswer = null; // Reset the current answer to wait for the 'takeheart' command
-            startRound(); // Send the next question immediately
         }
     }
 
     // Function to take a heart from another player
     async function takeHeart(fromUser, toUser) {
-        if (!chat.inGame) {
-            await conn.reply(m.chat, "No game in progress. Use 'hearts' to start a new game.", m);
-            return;
-        }
+        if (!chat.inGame) return; // If no game in progress, ignore the command
 
         if (chat.players[fromUser] && chat.players[toUser]) {
             if (chat.players[toUser].hearts > 0) {
@@ -139,7 +133,7 @@ let handler = async (m, { conn, command, args }) => {
         await startGame();
     } else if (/^join$/i.test(command)) {
         await joinGame(m.sender);
-    } else if (/^startr$/i.test(command)) {
+    } else if (/^start$/i.test(command)) {
         await startRound();
     } else if (/^takeheart$/i.test(command)) {
         let toUser = args[0]; // Assuming the command is 'takeheart @user'
@@ -151,6 +145,6 @@ let handler = async (m, { conn, command, args }) => {
     }
 };
 
-handler.command = /^(hearts|join|startr|takeheart|end)$/i;
+handler.command = /^(hearts|join|start|takeheart|end)$/i;
 
 export default handler;
