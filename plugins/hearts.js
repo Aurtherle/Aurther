@@ -1,12 +1,13 @@
 import { createRequire } from 'module';
 import fetch from 'node-fetch';
+import similarity from 'similarity';
+
 const require = createRequire(import.meta.url);
 const fs = require('fs');
-import similarity from 'similarity';
 
 const threshold = 0.72;
 
-// تهيئة حالة اللعبة
+// Initialize game state
 let قلوب = {
   isActive: false,
   players: {},
@@ -16,17 +17,22 @@ let قلوب = {
   currentQuestion: null,
   timer: null,
   playerPoints: {},
-  questionsRemaining: 3 // تم تحديد عدد الأسئلة بـ 3
+  questionsRemaining: 3 // Number of questions
 };
 
-// جلب البيانات من ملف JSON
+// Fetch data from JSON
 const fetchData = async () => {
-  const response = await fetch('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
-  const data = await response.json();
-  return data;
+  try {
+    const response = await fetch('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching data:', error);
+    return [];
+  }
 };
 
-// دالة للمساعدة في إنشاء رد
+// Helper function to create a response
 let توثيق = (m) => {
   return {
     "key": {
@@ -42,9 +48,9 @@ let توثيق = (m) => {
     },
     "participant": "0@s.whatsapp.net"
   }
-}
+};
 
-// إرسال سؤال جديد
+// Send new question
 let sendNewQuestion = async (conn, m) => {
   if (قلوب.questionsRemaining <= 0) {
     m.reply('> انتهت اللعبة! شكراً للمشاركة.');
@@ -58,10 +64,10 @@ let sendNewQuestion = async (conn, m) => {
   let message = await conn.sendMessage(m.chat, { image: { url: قلوب.currentQuestion.img }, caption: 'سؤال جديد!' });
   قلوب.questionsRemaining--;
 
-  قلوب.currentQuestion.messageId = message.key.id; // حفظ معرف الرسالة
+  قلوب.currentQuestion.messageId = message.key.id; // Save message ID
   if (قلوب.timer) clearTimeout(قلوب.timer);
   قلوب.timer = setTimeout(() => sendNewQuestion(conn, m), 30000);
-}
+};
 
 let handler = async (m, { conn, command, text, isAdmin }) => {
   switch (command) {
@@ -70,7 +76,7 @@ let handler = async (m, { conn, command, text, isAdmin }) => {
         قلوب.isActive = true;
         قلوب.players = {};
         قلوب.gameStarter = m.sender.split('@')[0];
-        قلوب.questionsRemaining = 3; // عدد الأسئلة المحدد
+        قلوب.questionsRemaining = 3; // Number of questions
         m.reply(`𒄟 ❰لـقـد بـدأت اللعـبة❱\n> ١. قم بالرد على هذه الرسالة لبدء المشاركة في اللعبة والحصول على 5 قلوب.\n> ٢. استخدم (.انقاص) لتقليل قلوب أحد اللاعبين عند الرد على رسالته.\n> ٣. اكتب (.نتيجه) لعرض قائمة اللاعبين وحالة قلوبهم.\n> ٤. اكتب (.انتهاء) لإنهاء اللعبة.\n\n> سيتم طرح 3 أسئلة.`);
       } else {
         m.reply('> اللعبة شغالة حالياً');
@@ -170,33 +176,33 @@ let handler = async (m, { conn, command, text, isAdmin }) => {
       m.reply('أمر غير معروف.');
       break;
   }
-}
+};
 
 const before = async (m, { conn }) => {
   let id = m.chat;
 
-  // التحقق من نشاط اللعبة
+  // Check if the game is active
   if (!قلوب.isActive) return true;
 
-  // التحقق من أن الرسالة المقتبسة من البوت
+  // Check if the quoted message is from the bot
   if (!m.quoted || !m.quoted.fromMe || !m.quoted.isBaileys || !m.text) return true;
 
-  // التحقق من أن اللاعب جزء من اللعبة
+  // Check if the player is part of the game
   if (!(m.sender.split('@')[0] in قلوب.players)) return true;
 
-  // التحقق من أن الرسالة المقتبسة هي الرسالة الصحيحة
+  // Check if the quoted message is the correct one
   if (قلوب.currentQuestion && m.quoted.id === قلوب.currentQuestion.messageId) {
     let answeringPlayer = m.sender.split('@')[0];
     let correctAnswer = قلوب.currentQuestion.name.toLowerCase().trim(); // Use 'name' as the correct answer field
     let playerAnswer = m.text.toLowerCase().trim();
 
-    // التحقق من الإجابة الصحيحة
+    // Check if the answer is correct
     if (similarity(playerAnswer, correctAnswer) >= threshold) {
       قلوب.players[answeringPlayer].points++;
       m.reply(`إجابة صحيحة! حصلت على نقطة @${answeringPlayer}`);
       sendNewQuestion(conn, m);
     } else {
-      // تقليل القلب إذا كانت الإجابة خاطئة
+      // Reduce heart if the answer is incorrect
       if (قلوب.players[answeringPlayer]) {
         قلوب.players[answeringPlayer].hearts--;
         if (قلوب.players[answeringPlayer].hearts <= 0) {
@@ -208,7 +214,7 @@ const before = async (m, { conn }) => {
       }
     }
 
-    // التحقق إذا كان هناك لاعب واحد فقط متبقي
+    // Check if there is only one player left
     if (Object.keys(قلوب.players).length === 1) {
       let remainingPlayer = Object.keys(قلوب.players)[0];
       m.reply(`اللعبة انتهت! الفائز هو @${remainingPlayer}`);
@@ -218,9 +224,9 @@ const before = async (m, { conn }) => {
   }
 
   return true;
-}
+};
 
-// تعيين الأوامر
+// Set commands
 handler.command = /^(قلوب|مشاركة|بدأ|انقاص|نتيجه|انتهاء)$/i;
 
 handler.botAdmin = true;
