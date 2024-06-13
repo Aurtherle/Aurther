@@ -12,6 +12,7 @@ let handler = async (m, { conn, command, args }) => {
     async function fetchData() {
         try {
             let response = await axios.get('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
+            console.log("Data fetched successfully.");
             return response.data;
         } catch (error) {
             console.error("Failed to fetch data:", error);
@@ -21,7 +22,10 @@ let handler = async (m, { conn, command, args }) => {
 
     // Function to start the game
     async function startGame() {
-        if (chat.inGame) return; // If a game is already in progress, ignore the start command
+        if (chat.inGame) {
+            await conn.reply(m.chat, "A game is already in progress. Please wait for it to end.", m);
+            return;
+        }
 
         chat.inGame = true;
         chat.allowJoining = true;
@@ -32,7 +36,10 @@ let handler = async (m, { conn, command, args }) => {
 
     // Function to handle player joining
     async function joinGame(user) {
-        if (!chat.allowJoining) return; // If joining is not allowed, ignore the join command
+        if (!chat.allowJoining) {
+            await conn.reply(m.chat, "Joining is currently not allowed. Please wait for the round to start.", m);
+            return;
+        }
 
         if (!chat.players[user]) {
             chat.players[user] = { hearts: 5 };
@@ -44,7 +51,8 @@ let handler = async (m, { conn, command, args }) => {
     async function startRound() {
         if (!chat.inGame) {
             console.log("No game in progress.");
-            return; // If no game is in progress, ignore the start command
+            await conn.reply(m.chat, "No game is in progress. Use 'hearts' to start a new game.", m);
+            return;
         }
 
         chat.allowJoining = false; // Stop allowing new players to join
@@ -73,12 +81,16 @@ let handler = async (m, { conn, command, args }) => {
         if (answer === chat.currentAnswer) {
             await conn.reply(m.chat, `${user} got it right! Type 'takeheart @user' to take a heart from another player.`, m);
             chat.currentAnswer = null; // Reset the current answer to wait for the 'takeheart' command
+            startRound(); // Send the next question immediately
         }
     }
 
     // Function to take a heart from another player
     async function takeHeart(fromUser, toUser) {
-        if (!chat.inGame) return; // If no game in progress, ignore the command
+        if (!chat.inGame) {
+            await conn.reply(m.chat, "No game in progress. Use 'hearts' to start a new game.", m);
+            return;
+        }
 
         if (chat.players[fromUser] && chat.players[toUser]) {
             if (chat.players[toUser].hearts > 0) {
