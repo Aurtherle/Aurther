@@ -76,6 +76,8 @@ let handler = async (m, { conn, command, args }) => {
         if (!chat.inGame || !chat.currentAnswer) return; // If no game or no current question, ignore the message
 
         let answer = message.toLowerCase().replace(/\s/g, '');
+        console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`); // Log the answers for debugging
+
         if (answer === chat.currentAnswer) {
             await conn.reply(m.chat, `${user} got it right! Type 'takeheart @user' to take a heart from another player.`, m);
             chat.currentAnswer = null; // Reset the current answer to wait for the 'takeheart' command
