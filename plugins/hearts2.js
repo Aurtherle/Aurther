@@ -1,16 +1,16 @@
 import axios from 'axios';
 
-// Define different heart shapes
-const heartShapes = ['❤️', '💛', '💚', '💙', '💜', '🧡', '🖤', '💔', '💖', '💗', '💘', '💝', '💞', '💟', '❣️'];
-
 let handler = async (m, { conn, command, args }) => {
     let chat = global.db.data.chats[m.chat];
-    chat.players = chat.players || {};
-    chat.inGame = chat.inGame || false;
-    chat.allowJoining = chat.allowJoining || false;
-    chat.currentImg = null;
-    chat.currentAnswer = null;
-    chat.roundStarted = false;
+    chat.players = chat.players || {}; // To store player data
+    chat.inGame = chat.inGame || false; // To check if the game is in progress
+    chat.allowJoining = chat.allowJoining || false; // To check if joining is allowed
+    chat.currentImg = null; // To store the current image URL
+    chat.currentAnswer = null; // To store the current answer
+    chat.roundStarted = false; // To track if a round has started
+
+    // Define heart shapes
+    const heartShapes = ['❤️', '💛', '💚', '💙', '💜', '🧡', '🖤', '💔', '💖', '💗', '💘', '💝', '💞', '💟', '❣️'];
 
     async function fetchData() {
         try {
@@ -23,6 +23,7 @@ let handler = async (m, { conn, command, args }) => {
         }
     }
 
+    // Function to start the game
     async function startGame() {
         if (chat.inGame) {
             await conn.reply(m.chat, "A game is already in progress.", m);
@@ -33,30 +34,26 @@ let handler = async (m, { conn, command, args }) => {
         chat.allowJoining = true;
         chat.players = {};
 
-        await conn.reply(m.chat, "The game has started! Type 'join <your name>' to participate. Type 'start' to begin the round.", m);
+        await conn.reply(m.chat, "The game has started! Type 'join' to participate. Type 'start' to begin the round.", m);
     }
 
-    async function joinGame(user, playerName) {
+    // Function to handle player joining
+    async function joinGame(user) {
         if (!chat.allowJoining) {
             await conn.reply(m.chat, "Joining is not allowed at this moment.", m);
             return;
         }
 
-        if (Object.keys(chat.players).length >= 15) {
-            await conn.reply(m.chat, "Maximum player count reached. Cannot join.", m);
-            return;
-        }
-
-        if (!chat.players[playerName]) {
-            // Assign 5 hearts to the new player with a unique heart shape
-            let uniqueHeart = heartShapes[Object.keys(chat.players).length % heartShapes.length];
-            chat.players[playerName] = { hearts: 5, heartShape: uniqueHeart };
-            await conn.reply(m.chat, `${playerName} has joined the game with 5 ${uniqueHeart}.`, m);
-        } else {
-            await conn.reply(m.chat, `${playerName} is already in the game.`, m);
+        if (!chat.players[user]) {
+            chat.players[user] = {
+                hearts: 5,
+                heartShape: heartShapes[Object.keys(chat.players).length % heartShapes.length] // Assign unique heart shape
+            };
+            await conn.reply(m.chat, `${user} has joined the game with 5 ${chat.players[user].heartShape}.`, m);
         }
     }
 
+    // Function to start the round
     async function startRound() {
         if (!chat.inGame) {
             await conn.reply(m.chat, "No game in progress. Start a game first using the 'hearts' command.", m);
@@ -80,31 +77,46 @@ let handler = async (m, { conn, command, args }) => {
 
         await conn.sendMessage(m.chat, { image: { url: chat.currentImg }, caption: "Guess the character!" });
 
-        // Set a timeout to send another image if no one answers in 10 seconds
+        // Set timeout to check if no one answers in 10 seconds
         setTimeout(async () => {
             if (chat.roundStarted) {
-                await startRound();
+                chat.roundStarted = false;
+                await conn.reply(m.chat, `Time's up! The answer was ${chat.currentAnswer}.`, m);
+                await startRound(); // Start a new round
             }
         }, 10000);
     }
 
+    // Function to handle player answer
     async function handleAnswer(user, message) {
         if (!chat.roundStarted) return;
 
-        let answer = message.trim().toLowerCase().replace(/\s/g, '');
+        let answer = message.trim().toLowerCase();
         console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
         if (answer === chat.currentAnswer) {
             chat.roundStarted = false;
             if (chat.players[user]) {
-                chat.players[user].points = (chat.players[user].points || 0) + 1;
+                chat.players[user].hearts--;
                 await conn.reply(m.chat, `${user} got it right!`, m);
-                await conn.reply(m.chat, `Points: ${chat.players[user].points}`, m);
-                await startRound();
+                await conn.reply(m.chat, `Remaining ${chat.players[user].heartShape}: ${chat.players[user].hearts}`, m);
+                if (chat.players[user].hearts === 0) {
+                    await conn.reply(m.chat, `${user} has been eliminated!`, m);
+                    delete chat.players[user];
+                }
+                if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
+                    // Check if only one player is left or all other players are eliminated
+                    let winner = Object.keys(chat.players)[0];
+                    await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
+                    chat.inGame = false;
+                } else {
+                    await startRound();
+                }
             }
         }
     }
 
+    // Function to take a heart from another player
     async function takeHeart(fromUser, toUser) {
         if (!chat.inGame) return;
 
@@ -120,7 +132,7 @@ let handler = async (m, { conn, command, args }) => {
 
                 await conn.reply(m.chat, `${fromUser} took a heart from ${toUser}.`, m);
 
-                if (Object.keys(chat.players).length === 1) {
+                if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
                     let winner = Object.keys(chat.players)[0];
                     await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
                     chat.inGame = false;
@@ -133,52 +145,42 @@ let handler = async (m, { conn, command, args }) => {
         }
     }
 
+    // Function to end the game
     async function endGame() {
         chat.inGame = false;
         chat.allowJoining = false;
         await conn.reply(m.chat, "The game has been ended.", m);
     }
 
-    async function showPlayers() {
-        if (!chat.inGame) {
-            await conn.reply(m.chat, "No game in progress.", m);
-            return;
+    // Function to show current game status
+    async function showStatus() {
+        let statusMsg = "Current Game Status:\n";
+        for (let user in chat.players) {
+            statusMsg += `${user}: ${chat.players[user].hearts} ${chat.players[user].heartShape}\n`;
         }
-
-        let playerList = "Players:\n";
-        for (let player in chat.players) {
-            playerList += `${player}: ${chat.players[player].hearts} ${chat.players[player].heartShape}\n`;
-        }
-        await conn.reply(m.chat, playerList, m);
+        await conn.reply(m.chat, statusMsg.trim(), m);
     }
 
+    // Command handler
     if (/^hearts$/i.test(command)) {
         await startGame();
     } else if (/^join$/i.test(command)) {
-        if (args.length < 1) {
-            await conn.reply(m.chat, "Please specify your name after 'join'.", m);
-            return;
-        }
-        let playerName = args[0].trim();
-        await joinGame(m.sender, playerName);
+        let playerName = args[0];
+        await joinGame(playerName);
     } else if (/^start$/i.test(command)) {
         await startRound();
     } else if (/^takeheart$/i.test(command)) {
-        if (args.length < 1) {
-            await conn.reply(m.chat, "Please specify a player to take a heart from.", m);
-            return;
-        }
-        let toUser = args[0].trim(); // Assuming the command is 'takeheart @user'
+        let toUser = args[0]; // Assuming the command is 'takeheart @user'
         await takeHeart(m.sender, toUser);
     } else if (/^end$/i.test(command)) {
         await endGame();
-    } else if (/^result$/i.test(command)) {
-        await showPlayers();
+    } else if (/^status$/i.test(command)) {
+        await showStatus();
     } else {
         await handleAnswer(m.sender, m.text);
     }
 };
 
-handler.command = /^(hearts|join|start|takeheart|end|result)$/i;
+handler.command = /^(hearts|join|start|takeheart|end|status)$/i;
 
 export default handler;
