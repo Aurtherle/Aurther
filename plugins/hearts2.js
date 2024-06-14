@@ -88,16 +88,11 @@ let handler = async (m, { conn, command, args }) => {
             }, 10000);
         }
 
-        // Function to handle a normalized message
-        function normalize(str) {
-            return str.trim().toLowerCase().replace(/\s/g, '');
-        }
-
         // Function to handle player answer
         async function handlePlayerAnswer(user, message) {
             if (!chat.roundStarted) return;
 
-            let answer = normalize(message);
+            let answer = message.trim().toLowerCase().replace(/\s/g, ''); // Normalize the answer
             console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
             if (answer === chat.currentAnswer) {
@@ -205,22 +200,11 @@ handler.all = async function (m) {
     }
 };
 
-// Ensure the handlePlayerAnswer function is defined outside and in the correct scope
-async function handlePlayerAnswer(user, message) {
-    let chat = global.db.data.chats[m.chat] || {};
-    if (!chat.roundStarted) return;
+// Normalizing function
+function normalize(str) {
+    return str.trim().toLowerCase().replace(/\s/g, '');
+}
 
-    let answer = normalize(message);
-    console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
+handler.command = /^(hearts|join|start|eraseheart|end|status)$/i;
 
-    if (answer === chat.currentAnswer) {
-        chat.roundStarted = false;
-        if (chat.players[user]) {
-            chat.players[user].hearts--;
-            await conn.reply(m.chat, `${user} got it right!`, m);
-            await conn.reply(m.chat, `Remaining ${chat.players[user].heartShape}: ${chat.players[user].hearts}`, m);
-            if (chat.players[user].hearts === 0) {
-                await conn.reply(m.chat, `${user} has been eliminated!`, m);
-                delete chat.players[user];
-            }
-            if (Object.keys(chat.players).length === 1 || Object
+export default handler;
