@@ -1,12 +1,19 @@
 import axios from 'axios';
 
-let handler = async (m, { conn }) => {
-    let players = {}; // Object to store players and their hearts
-    let currentRoundPlayers = []; // Array to track players in the current round
-    let gameStarted = false; // Flag to track if the game has started
-    let joinable = true; // Flag to allow players to join
+let handler = async (m, { conn, args }) => {
+    let chat = global.db.data.chats[m.chat];
+    let heartsGame = {
+        players: {},
+        heartsCount: 5,
+        gameStarted: false,
+        joinable: true,
+        currentItemIndex: 0,
+        shuffledData: [],
+        currentItem: null,
+        answered: false
+    };
 
-    // Fetch data from GitHub raw
+    // Function to fetch data from GitHub raw
     async function fetchData() {
         try {
             let response = await axios.get('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
@@ -17,7 +24,7 @@ let handler = async (m, { conn }) => {
         }
     }
 
-    // Shuffle an array (Fisher-Yates shuffle algorithm)
+    // Function to shuffle an array (Fisher-Yates shuffle algorithm)
     function shuffleArray(array) {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -28,34 +35,27 @@ let handler = async (m, { conn }) => {
 
     // Function to send the next question (image)
     async function sendNextQuestion() {
-        if (currentRoundPlayers.length === 1) {
-            let winner = currentRoundPlayers[0];
-            await conn.reply(m.chat, `🎉 الفائز هو ${winner}! 🎉`, m);
-            gameStarted = false;
-            return;
+        if (heartsGame.currentItemIndex < heartsGame.shuffledData.length && heartsGame.heartsCount > 1) {
+            heartsGame.currentItem = heartsGame.shuffledData[heartsGame.currentItemIndex];
+            let imgUrl = heartsGame.currentItem.img;
+            await conn.sendFile(m.chat, imgUrl, 'image.jpg', '', m); // Send the image question
+            heartsGame.answered = false; // Reset answered flag for the new question
+        } else {
+            // Game ends when there is only one player left with hearts
+            let winnerId = Object.keys(heartsGame.players)[0]; // Get the winner's ID
+            let winner = global.db.data.users[winnerId];
+            await conn.reply(m.chat, `الفائز هو ${winner.name}! 🎉`, m);
+            heartsGame = {
+                players: {},
+                heartsCount: 5,
+                gameStarted: false,
+                joinable: true,
+                currentItemIndex: 0,
+                shuffledData: [],
+                currentItem: null,
+                answered: false
+            }; // Reset game data
         }
-
-        let data = await fetchData();
-        if (data.length === 0) {
-            await conn.reply(m.chat, "❌ لم يتم العثور على بيانات الصور. حاول مرة أخرى لاحقًا.", m);
-            gameStarted = false;
-            return;
-        }
-
-        let shuffledData = shuffleArray(data);
-        let currentItem = shuffledData[0];
-        let imgUrl = currentItem.img;
-        let correctAnswer = currentItem.name;
-
-        await conn.sendFile(m.chat, imgUrl, 'image.jpg', `من هو هذا الشخص؟`, m);
-
-        // Schedule timeout for current question
-        setTimeout(async () => {
-            if (currentRoundPlayers.length > 1) {
-                await conn.reply(m.chat, `😔 لم يتم الإجابة بشكل صحيح. الجواب الصحيح هو: ${correctAnswer}`, m);
-                sendNextQuestion();
-            }
-        }, 10000); // 10 seconds timeout
     }
 
     // Function to handle messages
@@ -63,107 +63,63 @@ let handler = async (m, { conn }) => {
         let user = m.sender;
         let message = m.text.trim();
 
-        if (gameStarted && currentRoundPlayers.includes(user)) {
-            let data = await fetchData();
-            if (data.length === 0) return;
-
-            let currentItem = data[0];
-            let correctAnswer = currentItem.name;
-
-            if (message === correctAnswer) {
-                let playersExceptCurrent = currentRoundPlayers.filter(p => p !== user);
-                if (playersExceptCurrent.length > 0) {
-                    await conn.reply(m.chat, `👍 إجابة صحيحة! اختر لاعبًا ليمحو قلبه: ${playersExceptCurrent.join(', ')}`, m);
-                    return;
-                } else {
-                    await conn.reply(m.chat, `🎉 الفائز هو ${user}! 🎉`, m);
-                    gameStarted = false;
-                    return;
+        if (heartsGame.gameStarted && !heartsGame.answered && heartsGame.currentItem && normalize(heartsGame.currentItem.name) === normalize(message)) {
+            // If user's message matches the name (answer) and it's not already answered
+            let playersArr = Object.keys(heartsGame.players);
+            if (playersArr.length > 1) {
+                let randomPlayerId = playersArr[Math.floor(Math.random() * playersArr.length)];
+                heartsGame.players[randomPlayerId]--;
+                if (heartsGame.players[randomPlayerId] <= 0) {
+                    delete heartsGame.players[randomPlayerId];
+                    await conn.reply(m.chat, `${global.db.data.users[randomPlayerId].name} خسر قلبه! 💔`, m);
                 }
             }
-        }
-    };
-
-    // Command to join the game
-    handler.command = /^(join|الانضمام)$/i;
-    handler.join = async function (m, { conn }) {
-        if (!gameStarted && joinable) {
-            let user = m.sender;
-            if (!(user in players)) {
-                players[user] = 5; // Give the player 5 hearts initially
-                currentRoundPlayers.push(user);
-                await conn.reply(m.chat, `✅ تم الانضمام إلى اللعبة!`, m);
-            } else {
-                await conn.reply(m.chat, `ℹ️ أنت بالفعل مشترك في اللعبة.`, m);
-            }
-        }
-    };
-
-    // Command to start the game
-    handler.command = /^(start|بداية)$/i;
-    handler.start = async function (m, { conn }) {
-        if (!gameStarted && joinable && currentRoundPlayers.length > 1) {
-            gameStarted = true;
-            await conn.reply(m.chat, `🎮 تم بدأ اللعبة! انتظر حتى يتم إرسال صورة...`, m);
+            heartsGame.answered = true; // Mark the question as answered
+            heartsGame.currentItemIndex++; // Move to the next question
             sendNextQuestion();
-        } else {
-            await conn.reply(m.chat, `❌ لا يمكن بدأ اللعبة الآن. تأكد من أن هناك مشاركين كافيين وأن اللعبة غير مبدأة بالفعل.`, m);
         }
     };
 
-    // Command to end the game
-    handler.command = /^(end|نهاية)$/i;
+    // Function to normalize a string (remove whitespace, convert to lowercase, etc.)
+    function normalize(str) {
+        return str.replace(/\s/g, '').toLowerCase(); // Remove whitespace and convert to lowercase
+    }
+
+    // Join command to join the game
+    handler.command = /^(join)$/i;
+    handler.join = async function (m, { conn }) {
+        if (heartsGame.joinable && !heartsGame.players[m.sender]) {
+            heartsGame.players[m.sender] = heartsGame.heartsCount; // Give the player 5 hearts
+            await conn.reply(m.chat, `انضم ${global.db.data.users[m.sender].name} إلى اللعبة! 🎮`, m);
+        }
+    };
+
+    // Start command to start the game
+    handler.command = /^(start)$/i;
+    handler.start = async function (m, { conn }) {
+        if (!heartsGame.gameStarted && heartsGame.joinable && Object.keys(heartsGame.players).length > 1) {
+            heartsGame.shuffledData = shuffleArray(await fetchData()); // Shuffle the data array
+            heartsGame.gameStarted = true;
+            heartsGame.currentItemIndex = 0;
+            sendNextQuestion();
+        }
+    };
+
+    // End command to end the game
+    handler.command = /^(end)$/i;
     handler.end = async function (m, { conn }) {
-        if (gameStarted) {
-            await conn.reply(m.chat, `❌ تم إنهاء اللعبة بواسطة الإداري.`, m);
-            gameStarted = false;
-        } else {
-            await conn.reply(m.chat, `ℹ️ لا يمكن إنهاء اللعبة في الوقت الحالي.`, m);
-        }
-    };
-
-    // Command to take a heart from another player
-    handler.command = /^(takeheart|أخذ_قلب) (.*)$/i;
-    handler.takeheart = async function (m, { conn, args }) {
-        let targetPlayer = args[1];
-        let user = m.sender;
-
-        if (!gameStarted || !currentRoundPlayers.includes(user)) {
-            await conn.reply(m.chat, `❌ لا يمكنك استخدام هذا الأمر الآن.`, m);
-            return;
-        }
-
-        if (!(targetPlayer in players)) {
-            await conn.reply(m.chat, `❌ لا يمكن العثور على اللاعب المستهدف.`, m);
-            return;
-        }
-
-        if (targetPlayer === user) {
-            await conn.reply(m.chat, `❌ لا يمكنك إزالة قلب من نفسك.`, m);
-            return;
-        }
-
-        if (players[user] <= 0) {
-            await conn.reply(m.chat, `❌ ليس لديك قلوب للإزالة.`, m);
-            return;
-        }
-
-        players[targetPlayer] = Math.max(players[targetPlayer] - 1, 0);
-        await conn.reply(m.chat, `✅ تم حذف قلب واحد من ${targetPlayer}.`, m);
-    };
-
-    // Command to start the joining process
-    handler.command = /^(hearts|قلوب)$/i;
-    handler.hearts = async function (m, { conn }) {
-        if (!gameStarted && joinable) {
-            let user = m.sender;
-            if (!(user in players)) {
-                players[user] = 5; // Give the player 5 hearts initially
-                currentRoundPlayers.push(user);
-                await conn.reply(m.chat, `✅ تم الانضمام إلى اللعبة!`, m);
-            } else {
-                await conn.reply(m.chat, `ℹ️ أنت بالفعل مشترك في اللعبة.`, m);
-            }
+        if (heartsGame.gameStarted) {
+            heartsGame = {
+                players: {},
+                heartsCount: 5,
+                gameStarted: false,
+                joinable: true,
+                currentItemIndex: 0,
+                shuffledData: [],
+                currentItem: null,
+                answered: false
+            }; // Reset game data
+            await conn.reply(m.chat, "تم إنهاء اللعبة.", m);
         }
     };
 
