@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-let handler = async (m, { conn, args }) => {
+let handler = async (m, { conn }) => {
     let players = {}; // Object to store players and their hearts
     let currentRoundPlayers = []; // Array to track players in the current round
     let gameStarted = false; // Flag to track if the game has started
