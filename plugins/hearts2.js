@@ -1,14 +1,16 @@
-// Import necessary modules and setup
 import axios from 'axios';
+import { toLower } from 'lodash'; // Importing toLower function from lodash
 
 // Define handlePlayerAnswer globally
 async function handlePlayerAnswer(user, message, conn, m, chat) {
     if (!chat.roundStarted) return;
 
-    let answer = message.trim().toLowerCase().replace(/\s/g, ''); // Normalize the answer
-    console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
+    let answer = toLower(message.trim()).replace(/\s/g, ''); // Normalize the answer using lodash's toLower
+    let expectedAnswer = toLower(chat.currentAnswer.trim()).replace(/\s/g, ''); // Normalize the expected answer
 
-    if (answer === chat.currentAnswer) {
+    console.log(`User answer: ${answer}, Expected answer: ${expectedAnswer}`);
+
+    if (answer === expectedAnswer) {
         chat.roundStarted = false;
         if (chat.players[user]) {
             chat.players[user].hearts--;
@@ -106,7 +108,7 @@ let handler = async (m, { conn, command, args }) => {
 
             let randomIndex = Math.floor(Math.random() * data.length);
             chat.currentImg = data[randomIndex].img;
-            chat.currentAnswer = data[randomIndex].name.trim().toLowerCase().replace(/\s/g, '');
+            chat.currentAnswer = data[randomIndex].name; // Keep the answer as it is, assume it's already in Arabic
 
             console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`);
 
@@ -198,7 +200,7 @@ handler.all = async function (m, { conn }) { // Ensure conn is passed as argumen
         if (chat.roundStarted) {
             await handlePlayerAnswer(user, message, conn, m, chat); // Pass conn, m, and chat as arguments
         }
-    } catch (e) {
+            } catch (e) {
         console.error(e); // Log the error
         await conn.reply(m.chat, `An error occurred: ${e.message}`, m); // Send the error message
     }
