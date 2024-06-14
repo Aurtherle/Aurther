@@ -1,129 +1,141 @@
 import axios from 'axios';
 
-let handler = async (m, { conn, args }) => {
+let handler = async (m, { conn, command, args }) => {
     let chat = global.db.data.chats[m.chat];
-    let heartsGame = {
-        players: {},
-        heartsCount: 5,
-        gameStarted: false,
-        joinable: true,
-        currentItemIndex: 0,
-        shuffledData: [],
-        currentItem: null,
-        answered: false
-    };
+    chat.players = chat.players || {};
+    chat.inGame = chat.inGame || false;
+    chat.allowJoining = chat.allowJoining || false;
+    chat.currentImg = null;
+    chat.currentAnswer = null;
+    chat.roundStarted = false;
 
-    // Function to fetch data from GitHub raw
     async function fetchData() {
         try {
             let response = await axios.get('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
+            console.log("Data fetched:", response.data); // Log fetched data
             return response.data;
         } catch (error) {
             console.error("Failed to fetch data:", error);
-            return []; // Return an empty array if fetching fails
+            return [];
         }
     }
 
-    // Function to shuffle an array (Fisher-Yates shuffle algorithm)
-    function shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
+    async function startGame() {
+        if (chat.inGame) {
+            await conn.reply(m.chat, "A game is already in progress.", m);
+            return;
         }
-        return array;
+
+        chat.inGame = true;
+        chat.allowJoining = true;
+        chat.players = {};
+
+        await conn.reply(m.chat, "The game has started! Type 'join' to participate. Type 'start' to begin the round.", m);
     }
 
-    // Function to send the next question (image)
-    async function sendNextQuestion() {
-        if (heartsGame.currentItemIndex < heartsGame.shuffledData.length && heartsGame.heartsCount > 1) {
-            heartsGame.currentItem = heartsGame.shuffledData[heartsGame.currentItemIndex];
-            let imgUrl = heartsGame.currentItem.img;
-            await conn.sendFile(m.chat, imgUrl, 'image.jpg', '', m); // Send the image question
-            heartsGame.answered = false; // Reset answered flag for the new question
-        } else {
-            // Game ends when there is only one player left with hearts
-            let winnerId = Object.keys(heartsGame.players)[0]; // Get the winner's ID
-            let winner = global.db.data.users[winnerId];
-            await conn.reply(m.chat, `الفائز هو ${winner.name}! 🎉`, m);
-            heartsGame = {
-                players: {},
-                heartsCount: 5,
-                gameStarted: false,
-                joinable: true,
-                currentItemIndex: 0,
-                shuffledData: [],
-                currentItem: null,
-                answered: false
-            }; // Reset game data
+    async function joinGame(user) {
+        if (!chat.allowJoining) {
+            await conn.reply(m.chat, "Joining is not allowed at this moment.", m);
+            return;
+        }
+
+        if (!chat.players[user]) {
+            chat.players[user] = { hearts: 5 };
+            await conn.reply(m.chat, `${user} has joined the game with 5 hearts.`, m);
         }
     }
 
-    // Function to handle messages
-    handler.all = async function (m) {
-        let user = m.sender;
-        let message = m.text.trim();
+    async function startRound() {
+        if (!chat.inGame) {
+            await conn.reply(m.chat, "No game in progress. Start a game first using the 'hearts' command.", m);
+            return;
+        }
 
-        if (heartsGame.gameStarted && !heartsGame.answered && heartsGame.currentItem && normalize(heartsGame.currentItem.name) === normalize(message)) {
-            // If user's message matches the name (answer) and it's not already answered
-            let playersArr = Object.keys(heartsGame.players);
-            if (playersArr.length > 1) {
-                let randomPlayerId = playersArr[Math.floor(Math.random() * playersArr.length)];
-                heartsGame.players[randomPlayerId]--;
-                if (heartsGame.players[randomPlayerId] <= 0) {
-                    delete heartsGame.players[randomPlayerId];
-                    await conn.reply(m.chat, `${global.db.data.users[randomPlayerId].name} خسر قلبه! 💔`, m);
-                }
+        chat.allowJoining = false;
+        chat.roundStarted = true;
+
+        let data = await fetchData();
+        if (data.length === 0) {
+            await conn.reply(m.chat, "Failed to fetch questions. Please try again later.", m);
+            return;
+        }
+
+        let randomIndex = Math.floor(Math.random() * data.length);
+        chat.currentImg = data[randomIndex].img;
+        chat.currentAnswer = data[randomIndex].name.trim().toLowerCase().replace(/\s/g, '');
+
+        console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`);
+
+        await conn.sendMessage(m.chat, { image: { url: chat.currentImg }, caption: "Guess the character!" });
+    }
+
+    async function handleAnswer(user, message) {
+        if (!chat.roundStarted) return;
+
+        let answer = message.trim().toLowerCase().replace(/\s/g, '');
+        console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
+
+        if (answer === chat.currentAnswer) {
+            chat.roundStarted = false;
+            if (chat.players[user]) {
+                chat.players[user].points = (chat.players[user].points || 0) + 1;
+                await conn.reply(m.chat, `${user} got it right!`, m);
+                await conn.reply(m.chat, `Points: ${chat.players[user].points}`, m);
+                await startRound();
             }
-            heartsGame.answered = true; // Mark the question as answered
-            heartsGame.currentItemIndex++; // Move to the next question
-            sendNextQuestion();
         }
-    };
-
-    // Function to normalize a string (remove whitespace, convert to lowercase, etc.)
-    function normalize(str) {
-        return str.replace(/\s/g, '').toLowerCase(); // Remove whitespace and convert to lowercase
     }
 
-    // Join command to join the game
-    handler.command = /^(join)$/i;
-    handler.join = async function (m, { conn }) {
-        if (heartsGame.joinable && !heartsGame.players[m.sender]) {
-            heartsGame.players[m.sender] = heartsGame.heartsCount; // Give the player 5 hearts
-            await conn.reply(m.chat, `انضم ${global.db.data.users[m.sender].name} إلى اللعبة! 🎮`, m);
-        }
-    };
+    async function takeHeart(fromUser, toUser) {
+        if (!chat.inGame) return;
 
-    // Start command to start the game
-    handler.command = /^(start)$/i;
-    handler.start = async function (m, { conn }) {
-        if (!heartsGame.gameStarted && heartsGame.joinable && Object.keys(heartsGame.players).length > 1) {
-            heartsGame.shuffledData = shuffleArray(await fetchData()); // Shuffle the data array
-            heartsGame.gameStarted = true;
-            heartsGame.currentItemIndex = 0;
-            sendNextQuestion();
-        }
-    };
+        if (chat.players[fromUser] && chat.players[toUser]) {
+            if (chat.players[toUser].hearts > 0) {
+                chat.players[toUser].hearts--;
+                chat.players[fromUser].hearts++;
 
-    // End command to end the game
-    handler.command = /^(end)$/i;
-    handler.end = async function (m, { conn }) {
-        if (heartsGame.gameStarted) {
-            heartsGame = {
-                players: {},
-                heartsCount: 5,
-                gameStarted: false,
-                joinable: true,
-                currentItemIndex: 0,
-                shuffledData: [],
-                currentItem: null,
-                answered: false
-            }; // Reset game data
-            await conn.reply(m.chat, "تم إنهاء اللعبة.", m);
-        }
-    };
+                if (chat.players[toUser].hearts === 0) {
+                    await conn.reply(m.chat, `${toUser} has been eliminated!`, m);
+                    delete chat.players[toUser];
+                }
 
-    return true; // Message handled
+                await conn.reply(m.chat, `${fromUser} took a heart from ${toUser}.`, m);
+
+                if (Object.keys(chat.players).length === 1) {
+                    let winner = Object.keys(chat.players)[0];
+                    await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} hearts!`, m);
+                    chat.inGame = false;
+                } else {
+                    await startRound();
+                }
+            } else {
+                await conn.reply(m.chat, `${toUser} has no hearts left to take.`, m);
+            }
+        }
+    }
+
+    async function endGame() {
+        chat.inGame = false;
+        chat.allowJoining = false;
+        await conn.reply(m.chat, "The game has been ended.", m);
+    }
+
+    if (/^hearts$/i.test(command)) {
+        await startGame();
+    } else if (/^join$/i.test(command)) {
+        await joinGame(m.sender);
+    } else if (/^start$/i.test(command)) {
+        await startRound();
+    } else if (/^takeheart$/i.test(command)) {
+        let toUser = args[0]; // Assuming the command is 'takeheart @user'
+        await takeHeart(m.sender, toUser);
+    } else if (/^end$/i.test(command)) {
+        await endGame();
+    } else {
+        await handleAnswer(m.sender, m.text);
+    }
 };
+
+handler.command = /^(hearts|join|start|takeheart|end)$/i;
 
 export default handler;
