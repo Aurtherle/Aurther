@@ -177,7 +177,18 @@ let handler = async (m, { conn, command, args }) => {
     } else if (/^status$/i.test(command)) {
         await showStatus();
     } else {
-        await handleAnswer(m.sender, m.text);
+        // Check all messages sent after the photo to see if any match currentAnswer
+        if (m.quoted && m.quoted.fromMe && m.quoted.type == 'image' && chat.roundStarted) {
+            let messages = await conn.loadMessages(m.chat, 10); // Load last 10 messages in the chat
+            for (let msg of messages) {
+                if (msg.fromMe || msg.type !== 'chat') continue; // Skip own messages and non-chat messages
+                let answer = msg.text.trim().toLowerCase();
+                if (answer === chat.currentAnswer) {
+                    await handleAnswer(msg.sender, msg.text); // Handle the correct answer
+                    return;
+                }
+            }
+        }
     }
 };
 
