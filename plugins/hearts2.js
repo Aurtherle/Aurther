@@ -71,7 +71,7 @@ let handler = async (m, { conn, command, args }) => {
 
         let randomIndex = Math.floor(Math.random() * data.length);
         chat.currentImg = data[randomIndex].img;
-        chat.currentAnswer = data[randomIndex].name.trim();
+        chat.currentAnswer = data[randomIndex].name.trim().toLowerCase().replace(/\s/g, '');
 
         console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`);
 
@@ -81,7 +81,7 @@ let handler = async (m, { conn, command, args }) => {
         setTimeout(async () => {
             if (chat.roundStarted) {
                 chat.roundStarted = false;
-                await conn.reply(m.chat, `${chat.currentAnswer}`, m);
+                await conn.reply(m.chat, `Time's up! The answer was ${chat.currentAnswer}.`, m);
                 await startRound(); // Start a new round
             }
         }, 10000);
@@ -91,7 +91,7 @@ let handler = async (m, { conn, command, args }) => {
     async function handleAnswer(user, message) {
         if (!chat.roundStarted) return;
 
-        let answer = message.trim();
+        let answer = message.trim().toLowerCase();
         console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
         if (answer === chat.currentAnswer) {
@@ -176,16 +176,13 @@ let handler = async (m, { conn, command, args }) => {
     } else if (/^status$/i.test(command)) {
         await showStatus();
     } else {
-        // Check all messages sent after the photo to see if any match currentAnswer
-        if (m.quoted && m.quoted.fromMe && m.quoted.type == 'image' && chat.roundStarted) {
-            let messages = await conn.loadMessages(m.chat, 10); // Load last 10 messages in the chat
-            for (let msg of messages) {
-                if (msg.fromMe || msg.type !== 'chat') continue; // Skip own messages and non-chat messages
-                let answer = msg.text.trim();
-                if (answer === chat.currentAnswer) {
-                    await handleAnswer(msg.sender, msg.text); // Handle the correct answer
-                    return;
-                }
+        // Check if the message is a response to the current image question
+        if (chat.roundStarted && m.type === 'chat' && m.text) {
+            let answer = m.text.trim().toLowerCase().replace(/\s/g, '');
+            console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
+
+            if (answer === chat.currentAnswer) {
+                await handleAnswer(m.sender, m.text); // Handle the correct answer
             }
         }
     }
