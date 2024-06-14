@@ -1,4 +1,7 @@
 import axios from 'axios';
+import similarity from 'similarity';
+
+const threshold = 0.72;
 
 let handler = async (m, { conn, command, args }) => {
     let chat = global.db.data.chats[m.chat];
@@ -82,6 +85,10 @@ let handler = async (m, { conn, command, args }) => {
         if (answer === chat.currentAnswer) {
             await conn.reply(m.chat, `${user} got it right! Type 'takeheart @user' to take a heart from another player.`, m);
             chat.currentAnswer = null; // Reset the current answer to wait for the 'takeheart' command
+        } else if (similarity(answer, chat.currentAnswer) >= threshold) {
+            await conn.reply(m.chat, `*اوخخ قربتت*`, m);
+        } else {
+            await conn.reply(m.chat, `*نااه*`, m);
         }
     }
 
