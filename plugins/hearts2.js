@@ -1,9 +1,7 @@
 import axios from 'axios';
 
 let handler = async (m, { conn, args }) => {
-    let chat = global.db.data.chats[m.chat];
-    let players = []; // Array to store players who have joined
-    let hearts = {}; // Object to track hearts of each player
+    let players = {}; // Object to store players and their hearts
     let currentRoundPlayers = []; // Array to track players in the current round
     let gameStarted = false; // Flag to track if the game has started
     let joinable = true; // Flag to allow players to join
@@ -91,9 +89,9 @@ let handler = async (m, { conn, args }) => {
     handler.join = async function (m, { conn }) {
         if (!gameStarted && joinable) {
             let user = m.sender;
-            if (!players.includes(user)) {
-                players.push(user);
-                hearts[user] = 5; // Give the player 5 hearts initially
+            if (!(user in players)) {
+                players[user] = 5; // Give the player 5 hearts initially
+                currentRoundPlayers.push(user);
                 await conn.reply(m.chat, `✅ تم الانضمام إلى اللعبة!`, m);
             } else {
                 await conn.reply(m.chat, `ℹ️ أنت بالفعل مشترك في اللعبة.`, m);
@@ -104,8 +102,7 @@ let handler = async (m, { conn, args }) => {
     // Command to start the game
     handler.command = /^(start|بداية)$/i;
     handler.start = async function (m, { conn }) {
-        if (!gameStarted && joinable && players.length > 1) {
-            currentRoundPlayers = [...players]; // Copy players array for the current round
+        if (!gameStarted && joinable && currentRoundPlayers.length > 1) {
             gameStarted = true;
             await conn.reply(m.chat, `🎮 تم بدأ اللعبة! انتظر حتى يتم إرسال صورة...`, m);
             sendNextQuestion();
@@ -126,16 +123,48 @@ let handler = async (m, { conn, args }) => {
     };
 
     // Command to take a heart from another player
-    handler.command = /^(takeheart|أخذ_قلب)$/i;
+    handler.command = /^(takeheart|أخذ_قلب) (.*)$/i;
     handler.takeheart = async function (m, { conn, args }) {
-        let targetPlayer = args[0];
-        if (!gameStarted || !currentRoundPlayers.includes(m.sender) || !players.includes(targetPlayer)) {
+        let targetPlayer = args[1];
+        let user = m.sender;
+
+        if (!gameStarted || !currentRoundPlayers.includes(user)) {
             await conn.reply(m.chat, `❌ لا يمكنك استخدام هذا الأمر الآن.`, m);
             return;
         }
 
-        hearts[targetPlayer] = Math.max(hearts[targetPlayer] - 1, 0);
+        if (!(targetPlayer in players)) {
+            await conn.reply(m.chat, `❌ لا يمكن العثور على اللاعب المستهدف.`, m);
+            return;
+        }
+
+        if (targetPlayer === user) {
+            await conn.reply(m.chat, `❌ لا يمكنك إزالة قلب من نفسك.`, m);
+            return;
+        }
+
+        if (players[user] <= 0) {
+            await conn.reply(m.chat, `❌ ليس لديك قلوب للإزالة.`, m);
+            return;
+        }
+
+        players[targetPlayer] = Math.max(players[targetPlayer] - 1, 0);
         await conn.reply(m.chat, `✅ تم حذف قلب واحد من ${targetPlayer}.`, m);
+    };
+
+    // Command to start the joining process
+    handler.command = /^(hearts|قلوب)$/i;
+    handler.hearts = async function (m, { conn }) {
+        if (!gameStarted && joinable) {
+            let user = m.sender;
+            if (!(user in players)) {
+                players[user] = 5; // Give the player 5 hearts initially
+                currentRoundPlayers.push(user);
+                await conn.reply(m.chat, `✅ تم الانضمام إلى اللعبة!`, m);
+            } else {
+                await conn.reply(m.chat, `ℹ️ أنت بالفعل مشترك في اللعبة.`, m);
+            }
+        }
     };
 
     return true; // Message handled
