@@ -137,7 +137,7 @@ let handler = async (m, { conn, command, args }) => {
 
                     await conn.reply(m.chat, `${fromUser} erased a heart from ${toUser}.`, m);
 
-                    if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
+                    if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player > player.hearts === 0)) {
                         let winner = Object.keys(chat.players)[0];
                         await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
                         chat.inGame = false;
@@ -196,7 +196,36 @@ handler.all = async function (m) {
         let chat = global.db.data.chats[m.chat];
 
         if (chat.roundStarted) {
-            await handlePlayerAnswer(user, message); // Call the function directly
+            // Define handlePlayerAnswer function inside handler.all to ensure it has access to it
+            async function handlePlayerAnswer(user, message) {
+                if (!chat.roundStarted) return;
+
+                let answer = message.trim().toLowerCase().replace(/\s/g, '');
+                console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
+
+                if (answer === chat.currentAnswer) {
+                    chat.roundStarted = false;
+                    if (chat.players[user]) {
+                        chat.players[user].hearts--;
+                        await conn.reply(m.chat, `${user} got it right!`, m);
+                        await conn.reply(m.chat, `Remaining ${chat.players[user].heartShape}: ${chat.players[user].hearts}`, m);
+                        if (chat.players[user].hearts === 0) {
+                            await conn.reply(m.chat, `${user} has been eliminated!`, m);
+                            delete chat.players[user];
+                        }
+                        if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
+                            // Check if only one player is left or all other players are eliminated
+                            let winner = Object.keys(chat.players)[0];
+                            await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
+                            chat.inGame = false;
+                        } else {
+                            await startRound();
+                        }
+                    }
+                }
+            }
+
+            await handlePlayerAnswer(user, message);
         }
     } catch (e) {
         console.error(e); // Log the error
