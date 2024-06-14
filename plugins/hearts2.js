@@ -71,7 +71,7 @@ let handler = async (m, { conn, command, args }) => {
 
         let randomIndex = Math.floor(Math.random() * data.length);
         chat.currentImg = data[randomIndex].img;
-        chat.currentAnswer = data[randomIndex].name.trim().toLowerCase().replace(/\s/g, '');
+        chat.currentAnswer = data[randomIndex].name.trim();
 
         console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`);
 
@@ -81,7 +81,7 @@ let handler = async (m, { conn, command, args }) => {
         setTimeout(async () => {
             if (chat.roundStarted) {
                 chat.roundStarted = false;
-                await conn.reply(m.chat, `Time's up! The answer was ${chat.currentAnswer}.`, m);
+                await conn.reply(m.chat, `${chat.currentAnswer}`, m);
                 await startRound(); // Start a new round
             }
         }, 10000);
@@ -91,7 +91,7 @@ let handler = async (m, { conn, command, args }) => {
     async function handleAnswer(user, message) {
         if (!chat.roundStarted) return;
 
-        let answer = message.trim().toLowerCase();
+        let answer = message.trim();
         console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
         if (answer === chat.currentAnswer) {
@@ -116,21 +116,20 @@ let handler = async (m, { conn, command, args }) => {
         }
     }
 
-    // Function to take a heart from another player
-    async function takeHeart(fromUser, toUser) {
+    // Function to erase a heart from another player
+    async function eraseHeart(fromUser, toUser) {
         if (!chat.inGame) return;
 
         if (chat.players[fromUser] && chat.players[toUser]) {
             if (chat.players[toUser].hearts > 0) {
                 chat.players[toUser].hearts--;
-                chat.players[fromUser].hearts++;
 
                 if (chat.players[toUser].hearts === 0) {
                     await conn.reply(m.chat, `${toUser} has been eliminated!`, m);
                     delete chat.players[toUser];
                 }
 
-                await conn.reply(m.chat, `${fromUser} took a heart from ${toUser}.`, m);
+                await conn.reply(m.chat, `${fromUser} erased a heart from ${toUser}.`, m);
 
                 if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
                     let winner = Object.keys(chat.players)[0];
@@ -140,7 +139,7 @@ let handler = async (m, { conn, command, args }) => {
                     await startRound();
                 }
             } else {
-                await conn.reply(m.chat, `${toUser} has no hearts left to take.`, m);
+                await conn.reply(m.chat, `${toUser} has no hearts left to erase.`, m);
             }
         }
     }
@@ -169,9 +168,9 @@ let handler = async (m, { conn, command, args }) => {
         await joinGame(playerName);
     } else if (/^start$/i.test(command)) {
         await startRound();
-    } else if (/^takeheart$/i.test(command)) {
-        let toUser = args[0]; // Assuming the command is 'takeheart @user'
-        await takeHeart(m.sender, toUser);
+    } else if (/^eraseheart$/i.test(command)) {
+        let toUser = args[0]; // Assuming the command is 'eraseheart @user'
+        await eraseHeart(m.sender, toUser);
     } else if (/^end$/i.test(command)) {
         await endGame();
     } else if (/^status$/i.test(command)) {
@@ -182,7 +181,7 @@ let handler = async (m, { conn, command, args }) => {
             let messages = await conn.loadMessages(m.chat, 10); // Load last 10 messages in the chat
             for (let msg of messages) {
                 if (msg.fromMe || msg.type !== 'chat') continue; // Skip own messages and non-chat messages
-                let answer = msg.text.trim().toLowerCase();
+                let answer = msg.text.trim();
                 if (answer === chat.currentAnswer) {
                     await handleAnswer(msg.sender, msg.text); // Handle the correct answer
                     return;
@@ -192,6 +191,6 @@ let handler = async (m, { conn, command, args }) => {
     }
 };
 
-handler.command = /^(hearts|join|start|takeheart|end|status)$/i;
+handler.command = /^(hearts|join|start|eraseheart|end|status)$/i;
 
 export default handler;
