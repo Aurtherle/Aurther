@@ -1,11 +1,10 @@
-// Import necessary modules and setup
 import axios from 'axios';
 
 // Define handlePlayerAnswer globally
 async function handlePlayerAnswer(user, message, conn, m, chat) {
     if (!chat.roundStarted) return;
 
-    let answer = message.trim().toLowerCase().replace(/\s/g, ''); // Normalize the answer
+    let answer = normalizeArabic(message.trim());
     console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
     if (answer === chat.currentAnswer) {
@@ -104,7 +103,7 @@ let handler = async (m, { conn, command, args }) => {
 
             let randomIndex = Math.floor(Math.random() * data.length);
             chat.currentImg = data[randomIndex].img;
-            chat.currentAnswer = data[randomIndex].name.trim().toLowerCase().replace(/\s/g, '');
+            chat.currentAnswer = normalizeArabic(data[randomIndex].name.trim());
 
             console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`);
 
@@ -162,6 +161,11 @@ let handler = async (m, { conn, command, args }) => {
                 statusMsg += `${user}: ${chat.players[user].hearts} ${chat.players[user].heartShape}\n`;
             }
             await conn.reply(m.chat, statusMsg.trim(), m);
+        }
+
+        // Function to normalize Arabic text
+        function normalizeArabic(text) {
+            return text.normalize('NFKD').replace(/[\u064B-\u0652\u0640]/g, '').trim();
         }
 
         // Command handler
