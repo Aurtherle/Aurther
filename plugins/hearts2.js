@@ -207,7 +207,7 @@ handler.all = async function (m) {
 
 // Ensure the handlePlayerAnswer function is defined outside and in the correct scope
 async function handlePlayerAnswer(user, message) {
-    let chat = global.db.data.chats[user.chat] || {};
+    let chat = global.db.data.chats[m.chat] || {};
     if (!chat.roundStarted) return;
 
     let answer = normalize(message);
@@ -217,30 +217,10 @@ async function handlePlayerAnswer(user, message) {
         chat.roundStarted = false;
         if (chat.players[user]) {
             chat.players[user].hearts--;
-            await conn.reply(user.chat, `${user} got it right!`, user);
-            await conn.reply(user.chat, `Remaining ${chat.players[user].heartShape}: ${chat.players[user].hearts}`, user);
+            await conn.reply(m.chat, `${user} got it right!`, m);
+            await conn.reply(m.chat, `Remaining ${chat.players[user].heartShape}: ${chat.players[user].hearts}`, m);
             if (chat.players[user].hearts === 0) {
-                await conn.reply(user.chat, `${user} has been eliminated!`, user);
+                await conn.reply(m.chat, `${user} has been eliminated!`, m);
                 delete chat.players[user];
             }
-            if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
-                // Check if only one player is left or all other players are eliminated
-                let winner = Object.keys(chat.players)[0];
-                await conn.reply(user.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, user);
-                chat.inGame = false;
-            } else {
-                console.log('Starting new round after correct answer...');
-                await startRound();
-            }
-        }
-    }
-}
-
-// Normalizing function
-function normalize(str) {
-    return str.trim().toLowerCase().replace(/\s/g, '');
-}
-
-handler.command = /^(hearts|join|start|eraseheart|end|status)$/i;
-
-export default handler;
+            if (Object.keys(chat.players).length === 1 || Object
