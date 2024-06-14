@@ -80,8 +80,13 @@ let handler = async (m, { conn, command, args }) => {
         console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
         if (answer === chat.currentAnswer) {
-            await conn.reply(m.chat, `${user} got it right! Type 'takeheart @user' to take a heart from another player.`, m);
             chat.roundStarted = false;
+            if (chat.players[user]) {
+                chat.players[user].points = (chat.players[user].points || 0) + 1;
+                await conn.reply(m.chat, `${user} got it right!`, m);
+                await conn.reply(m.chat, `Points: ${chat.players[user].points}`, m);
+                await startRound();
+            }
         }
     }
 
