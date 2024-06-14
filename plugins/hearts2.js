@@ -5,9 +5,9 @@ let handler = async (m, { conn, command, args }) => {
     chat.players = chat.players || {}; // To store player data
     chat.inGame = chat.inGame || false; // To check if the game is in progress
     chat.allowJoining = chat.allowJoining || false; // To check if joining is allowed
-    chat.currentQuestion = chat.currentQuestion || null; // To store the current question
-    chat.currentAnswer = chat.currentAnswer || null; // To store the current answer
-    chat.currentImg = chat.currentImg || null; // To store the current image
+    chat.currentImg = null; // To store the current image URL
+    chat.currentAnswer = null; // To store the current answer
+    chat.roundStarted = false; // To track if a round has started
 
     async function fetchData() {
         try {
@@ -16,7 +16,7 @@ let handler = async (m, { conn, command, args }) => {
             return response.data;
         } catch (error) {
             console.error("Failed to fetch data:", error);
-            return []; // Return an empty array if fetching fails
+            return [];
         }
     }
 
@@ -24,12 +24,12 @@ let handler = async (m, { conn, command, args }) => {
     async function startGame() {
         if (chat.inGame) {
             await conn.reply(m.chat, "A game is already in progress.", m);
-            return; // If a game is already in progress, ignore the start command
+            return;
         }
 
         chat.inGame = true;
         chat.allowJoining = true;
-        chat.players = {}; // Reset player data
+        chat.players = {};
 
         await conn.reply(m.chat, "The game has started! Type 'join' to participate. Type 'start' to begin the round.", m);
     }
@@ -38,7 +38,7 @@ let handler = async (m, { conn, command, args }) => {
     async function joinGame(user) {
         if (!chat.allowJoining) {
             await conn.reply(m.chat, "Joining is not allowed at this moment.", m);
-            return; // If joining is not allowed, ignore the join command
+            return;
         }
 
         if (!chat.players[user]) {
@@ -51,10 +51,11 @@ let handler = async (m, { conn, command, args }) => {
     async function startRound() {
         if (!chat.inGame) {
             await conn.reply(m.chat, "No game in progress. Start a game first using the 'hearts' command.", m);
-            return; // If no game is in progress, ignore the start command
+            return;
         }
 
-        chat.allowJoining = false; // Stop allowing new players to join
+        chat.allowJoining = false;
+        chat.roundStarted = true;
 
         let data = await fetchData();
         if (data.length === 0) {
@@ -62,32 +63,31 @@ let handler = async (m, { conn, command, args }) => {
             return;
         }
 
-        let shuffledData = shuffleArray(data);
-        chat.currentQuestion = shuffledData[0];
-        chat.currentAnswer = chat.currentQuestion.name.trim().toLowerCase().replace(/\s/g, '');
-        chat.currentImg = chat.currentQuestion.img;
+        let randomIndex = Math.floor(Math.random() * data.length);
+        chat.currentImg = data[randomIndex].img;
+        chat.currentAnswer = data[randomIndex].name.trim().toLowerCase().replace(/\s/g, '');
 
-        console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`); // Log the current question details
+        console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`);
 
-        await conn.sendMessage(m.chat, { image: { url: chat.currentImg }, caption: "Guess the anime!" });
+        await conn.sendMessage(m.chat, { image: { url: chat.currentImg }, caption: "Guess the character!" });
     }
 
     // Function to handle player answer
     async function handleAnswer(user, message) {
-        if (!chat.inGame || !chat.currentAnswer) return; // If no game or no current question, ignore the message
+        if (!chat.roundStarted) return;
 
         let answer = message.trim().toLowerCase().replace(/\s/g, '');
-        console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`); // Log the answers for debugging
+        console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
         if (answer === chat.currentAnswer) {
             await conn.reply(m.chat, `${user} got it right! Type 'takeheart @user' to take a heart from another player.`, m);
-            chat.currentAnswer = null; // Reset the current answer to wait for the 'takeheart' command
+            chat.roundStarted = false;
         }
     }
 
     // Function to take a heart from another player
     async function takeHeart(fromUser, toUser) {
-        if (!chat.inGame) return; // If no game in progress, ignore the command
+        if (!chat.inGame) return;
 
         if (chat.players[fromUser] && chat.players[toUser]) {
             if (chat.players[toUser].hearts > 0) {
@@ -101,13 +101,12 @@ let handler = async (m, { conn, command, args }) => {
 
                 await conn.reply(m.chat, `${fromUser} took a heart from ${toUser}.`, m);
 
-                // Check if only one player is left
                 if (Object.keys(chat.players).length === 1) {
                     let winner = Object.keys(chat.players)[0];
                     await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} hearts!`, m);
-                    chat.inGame = false; // End the game
+                    chat.inGame = false;
                 } else {
-                    await startRound(); // Send the next question
+                    await startRound();
                 }
             } else {
                 await conn.reply(m.chat, `${toUser} has no hearts left to take.`, m);
@@ -120,15 +119,6 @@ let handler = async (m, { conn, command, args }) => {
         chat.inGame = false;
         chat.allowJoining = false;
         await conn.reply(m.chat, "The game has been ended.", m);
-    }
-
-    // Function to shuffle an array (Fisher-Yates shuffle algorithm)
-    function shuffleArray(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [array[i], array[j]] = [array[j], array[i]];
-        }
-        return array;
     }
 
     // Command handler
