@@ -87,11 +87,16 @@ let handler = async (m, { conn, command, args }) => {
         }, 10000);
     }
 
+    // Function to handle a normalized message
+    function normalize(str) {
+        return str.trim().toLowerCase().replace(/\s/g, '');
+    }
+
     // Function to handle player answer
-    async function handleAnswer(user, message) {
+    async function handlePlayerAnswer(user, message) {
         if (!chat.roundStarted) return;
 
-        let answer = message.trim().toLowerCase();
+        let answer = normalize(message);
         console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
         if (answer === chat.currentAnswer) {
@@ -131,7 +136,7 @@ let handler = async (m, { conn, command, args }) => {
 
                 await conn.reply(m.chat, `${fromUser} erased a heart from ${toUser}.`, m);
 
-                if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
+                if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every player => player.hearts === 0)) {
                     let winner = Object.keys(chat.players)[0];
                     await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
                     chat.inGame = false;
@@ -175,19 +180,6 @@ let handler = async (m, { conn, command, args }) => {
         await endGame();
     } else if (/^status$/i.test(command)) {
         await showStatus();
-    } else {
-        // Check all messages sent after the photo to see if any match currentAnswer
-        if (m.quoted && m.quoted.fromMe && m.quoted.type == 'image' && chat.roundStarted) {
-            let messages = await conn.loadMessages(m.chat, 10); // Load last 10 messages in the chat
-            for (let msg of messages) {
-                if (msg.fromMe || msg.type !== 'chat') continue; // Skip own messages and non-chat messages
-                let answer = msg.text.trim().toLowerCase();
-                if (answer === chat.currentAnswer) {
-                    await handleAnswer(msg.sender, msg.text); // Handle the correct answer
-                    return;
-                }
-            }
-        }
     }
 };
 
@@ -197,9 +189,8 @@ handler.all = async function (m) {
     let message = m.text.trim();
     let chat = global.db.data.chats[m.chat];
 
-    if (chat.roundStarted && !answered && normalize(message) === normalize(chat.currentAnswer)) {
-        // If user's message matches the answer and it's not already answered, handle it
-        await handleAnswer(user, message);
+    if (chat.roundStarted) {
+        await handlePlayerAnswer(user, message);
     }
 };
 
