@@ -196,7 +196,7 @@ handler.all = async function (m) {
         let chat = global.db.data.chats[m.chat];
 
         if (chat.roundStarted) {
-            await handler.handlePlayerAnswer(user, message); // Note: Change 'handler.handlePlayerAnswer' to 'handlePlayerAnswer' if it's in the same scope
+            await handlePlayerAnswer(user, message); // Call the function directly
         }
     } catch (e) {
         console.error(e); // Log the error
