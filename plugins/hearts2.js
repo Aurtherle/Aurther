@@ -136,7 +136,7 @@ let handler = async (m, { conn, command, args }) => {
 
                 await conn.reply(m.chat, `${fromUser} erased a heart from ${toUser}.`, m);
 
-                if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every player => player.hearts === 0)) {
+                if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
                     let winner = Object.keys(chat.players)[0];
                     await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
                     chat.inGame = false;
