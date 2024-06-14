@@ -176,15 +176,30 @@ let handler = async (m, { conn, command, args }) => {
     } else if (/^status$/i.test(command)) {
         await showStatus();
     } else {
-        // Check if the message is a response to the current image question
-        if (chat.roundStarted && m.type === 'chat' && m.text) {
-            let answer = m.text.trim().toLowerCase().replace(/\s/g, '');
-            console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
-
-            if (answer === chat.currentAnswer) {
-                await handleAnswer(m.sender, m.text); // Handle the correct answer
+        // Check all messages sent after the photo to see if any match currentAnswer
+        if (m.quoted && m.quoted.fromMe && m.quoted.type == 'image' && chat.roundStarted) {
+            let messages = await conn.loadMessages(m.chat, 10); // Load last 10 messages in the chat
+            for (let msg of messages) {
+                if (msg.fromMe || msg.type !== 'chat') continue; // Skip own messages and non-chat messages
+                let answer = msg.text.trim().toLowerCase();
+                if (answer === chat.currentAnswer) {
+                    await handleAnswer(msg.sender, msg.text); // Handle the correct answer
+                    return;
+                }
             }
         }
+    }
+};
+
+// Handle all incoming messages
+handler.all = async function (m) {
+    let user = m.sender;
+    let message = m.text.trim();
+    let chat = global.db.data.chats[m.chat];
+
+    if (chat.roundStarted && !answered && normalize(message) === normalize(chat.currentAnswer)) {
+        // If user's message matches the answer and it's not already answered, handle it
+        await handleAnswer(user, message);
     }
 };
 
