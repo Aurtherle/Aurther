@@ -2,7 +2,7 @@ import axios from 'axios';
 
 let handler = async (m, { conn, command, args }) => {
     try {
-        let chat = global.db.data.chats[m.chat];
+        let chat = global.db.data.chats[m.chat] || {};
         chat.players = chat.players || {}; // To store player data
         chat.inGame = chat.inGame || false; // To check if the game is in progress
         chat.allowJoining = chat.allowJoining || false; // To check if joining is allowed
@@ -192,9 +192,9 @@ let handler = async (m, { conn, command, args }) => {
 // Handle all incoming messages
 handler.all = async function (m) {
     try {
+        let chat = global.db.data.chats[m.chat] || {};
         let user = m.sender;
         let message = m.text.trim();
-        let chat = global.db.data.chats[m.chat];
 
         if (chat.roundStarted) {
             await handlePlayerAnswer(user, message);
@@ -207,7 +207,7 @@ handler.all = async function (m) {
 
 // Ensure the handlePlayerAnswer function is defined outside and in the correct scope
 async function handlePlayerAnswer(user, message) {
-    let chat = global.db.data.chats[user.chat];
+    let chat = global.db.data.chats[user.chat] || {};
     if (!chat.roundStarted) return;
 
     let answer = normalize(message);
