@@ -1,36 +1,5 @@
 import axios from 'axios';
 
-// Define handlePlayerAnswer globally
-async function handlePlayerAnswer(user, message, conn, m, chat) {
-    if (!chat.roundStarted) return;
-
-    let answer = normalizeArabic(message.trim());
-    console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
-
-    if (answer === chat.currentAnswer) {
-        chat.roundStarted = false;
-        if (chat.players[user]) {
-            chat.players[user].hearts--;
-            await conn.reply(m.chat, `${user} got it right!`, m);
-            await conn.reply(m.chat, `Remaining ${chat.players[user].heartShape}: ${chat.players[user].hearts}`, m);
-            if (chat.players[user].hearts === 0) {
-                await conn.reply(m.chat, `${user} has been eliminated!`, m);
-                delete chat.players[user];
-            }
-            if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
-                // Check if only one player is left or all other players are eliminated
-                let winner = Object.keys(chat.players)[0];
-                await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
-                chat.inGame = false;
-            } else {
-                console.log('Starting new round after correct answer...');
-                await startRound(conn, m, chat); // Ensure startRound is called properly
-            }
-        }
-    }
-}
-
-// Command handler
 let handler = async (m, { conn, command, args }) => {
     try {
         let chat = global.db.data.chats[m.chat] || {};
@@ -103,7 +72,7 @@ let handler = async (m, { conn, command, args }) => {
 
             let randomIndex = Math.floor(Math.random() * data.length);
             chat.currentImg = data[randomIndex].img;
-            chat.currentAnswer = normalizeArabic(data[randomIndex].name.trim());
+            chat.currentAnswer = data[randomIndex].name.trim().toLowerCase().replace(/\s/g, '');
 
             console.log(`Sending image question: ${chat.currentImg} with answer: ${chat.currentAnswer}`);
 
@@ -120,7 +89,7 @@ let handler = async (m, { conn, command, args }) => {
         }
 
         // Function to erase a heart from another player
-        async function eraseHeart(fromUser, toUser) {
+        async function eraseHeart(fromUser, toUser, conn, m, chat) {
             if (!chat.inGame) return;
 
             if (chat.players[fromUser] && chat.players[toUser]) {
@@ -163,11 +132,6 @@ let handler = async (m, { conn, command, args }) => {
             await conn.reply(m.chat, statusMsg.trim(), m);
         }
 
-        // Function to normalize Arabic text
-        function normalizeArabic(text) {
-            return text.normalize('NFKD').replace(/[\u064B-\u0652\u0640]/g, '').trim();
-        }
-
         // Command handler
         if (/^hearts$/i.test(command)) {
             await startGame();
@@ -178,7 +142,7 @@ let handler = async (m, { conn, command, args }) => {
             await startRound(conn, m, chat); // Pass conn, m, and chat as arguments
         } else if (/^eraseheart$/i.test(command)) {
             let toUser = args[0]; // Assuming the command is 'eraseheart @user'
-            await eraseHeart(m.sender, toUser);
+            await eraseHeart(m.sender, toUser, conn, m, chat);
         } else if (/^end$/i.test(command)) {
             await endGame();
         } else if (/^status$/i.test(command)) {
@@ -205,6 +169,36 @@ handler.all = async function (m, { conn }) { // Ensure conn is passed as argumen
         await conn.reply(m.chat, `An error occurred: ${e.message}`, m); // Send the error message
     }
 };
+
+// Define handlePlayerAnswer globally
+async function handlePlayerAnswer(user, message, conn, m, chat) {
+    if (!chat.roundStarted) return;
+
+    let answer = message.trim().toLowerCase().replace(/\s/g, ''); // Normalize the answer
+    console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
+
+    if (answer === chat.currentAnswer) {
+        chat.roundStarted = false;
+        if (chat.players[user]) {
+            chat.players[user].hearts--;
+            await conn.reply(m.chat, `${user} got it right!`, m);
+            await conn.reply(m.chat, `Remaining ${chat.players[user].heartShape}: ${chat.players[user].hearts}`, m);
+            if (chat.players[user].hearts === 0) {
+                await conn.reply(m.chat, `${user} has been eliminated!`, m);
+                delete chat.players[user];
+            }
+            if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
+                // Check if only one player is left or all other players are eliminated
+                let winner = Object.keys(chat.players)[0];
+                await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
+                chat.inGame = false;
+            } else {
+                console.log('Starting new round after correct answer...');
+                await startRound(conn, m, chat); // Ensure startRound is called properly
+            }
+        }
+    }
+}
 
 handler.command = /^(hearts|join|start|eraseheart|end|status)$/i;
 
