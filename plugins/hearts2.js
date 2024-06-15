@@ -1,5 +1,6 @@
 // Import necessary modules
 import axios from 'axios';
+import stringSimilarity from 'string-similarity'; // Ensure you install this library
 
 // Define handler function
 let handler = async (m, { conn, command, args }) => {
@@ -148,7 +149,11 @@ let handler = async (m, { conn, command, args }) => {
             let answer = message.trim().toLowerCase(); // Normalize the answer
             console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
-            if (answer === chat.currentAnswer) {
+            // Use string similarity to check if the answer is close enough
+            let similarity = stringSimilarity.compareTwoStrings(answer, chat.currentAnswer);
+            console.log(`Similarity score: ${similarity}`);
+
+            if (similarity > 0.8) { // You can adjust this threshold as needed
                 chat.roundStarted = false;
                 if (chat.players[user]) {
                     chat.players[user].hearts--;
@@ -200,7 +205,7 @@ handler.all = async function (m, { conn }) { // Ensure conn is passed as argumen
         let user = m.sender;
         let message = m.text.trim();
 
-        if (chat.roundStarted) {
+            if (chat.roundStarted) {
             await handlePlayerAnswer(user, message, conn, m, chat); // Pass conn, m, and chat as arguments
         }
     } catch (e) {
