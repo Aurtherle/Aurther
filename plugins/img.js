@@ -30,22 +30,6 @@ let handler = async (m, { conn, args }) => {
         return array;
     }
 
-    // Function to generate leaderboard message
-    async function generateLeaderboard() {
-        let leaderboard = Object.entries(players).sort((a, b) => b[1].hearts - a[1].hearts);
-        let leaderboardMsg = "*❃ ──────⊰ ❀ ⊱────── ❃*\n\n *المشاركين :*\n\n";
-        leaderboard.forEach((entry, index) => {
-            let [userId, player] = entry;
-            let user = global.db.data.users[userId];
-            if (!user) return;
-            let { name } = user;
-            let emoji = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "";
-            leaderboardMsg += `◍ *${name} : ${player.hearts}* ❤️ ${emoji}\n`;
-        });
-        leaderboardMsg += "\n*❃ ──────⊰ ❀ ⊱────── ❃*";
-        return leaderboardMsg;
-    }
-
     // Function to send the next question with an image and clue
     async function sendNextQuestion() {
         if (Object.keys(players).length < 2) {
@@ -53,6 +37,7 @@ let handler = async (m, { conn, args }) => {
             let winner = Object.keys(players)[0];
             let winnerName = global.db.data.users[winner].name;
             await conn.reply(m.chat, `*Game Over!*\n\n*Winner:* ${winnerName}`, m);
+            gameStarted = false;
             return;
         }
 
@@ -73,9 +58,8 @@ let handler = async (m, { conn, args }) => {
                 }
             }, 8000);
         } else {
-            // When all questions are sent or the count limit is reached, generate and send leaderboard
-            let leaderboardMsg = await generateLeaderboard();
-            await conn.reply(m.chat, leaderboardMsg, m);
+            await conn.reply(m.chat, `No more questions available.`, m);
+            gameStarted = false;
         }
     }
 
@@ -83,7 +67,7 @@ let handler = async (m, { conn, args }) => {
     handler.all = async function (m) {
         let user = m.sender;
         let message = m.text.trim();
-        
+
         if (!gameStarted && message.toLowerCase() === 'join') {
             if (!players[user]) {
                 players[user] = { hearts: 5 }; // Give player 5 hearts
@@ -134,6 +118,6 @@ let handler = async (m, { conn, args }) => {
     return true; // Message handled
 };
 
-handler.command = /^(heart)$/i;
+handler.command = /^(كتابة|كت)$/i;
 
 export default handler;
