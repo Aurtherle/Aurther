@@ -1,164 +1,238 @@
 import axios from 'axios';
 
-let players = {}; // Object to track players and their hearts
-let currentItemIndex = 0; // Index of the current item being processed
-let currentItem; // Current item being processed
-let answered = false; // Flag to track if the question has been answered
-let gameStarted = false; // Flag to track if the game has started
-let shuffledData = []; // Shuffled data array
+let handler = async (m, { conn, args }) => {
+    let gameData = {
+        active: false, // Flag to track if the game is active
+        players: {}, // Object to store players and their hearts
+        currentRound: 0, // Current round of the game
+        currentImage: null, // Current image being shown
+        answered: false, // Flag to track if current image question is answered
+        maxPlayers: 15, // Maximum number of players allowed
+        minPlayers: 2, // Minimum number of players required to start the game
+        timeout: 15000, // Timeout for answering each image question (15 seconds)
+    };
 
-// Function to fetch data from GitHub raw
-async function fetchData() {
-    try {
-        let response = await axios.get('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
-        return response.data;
-    } catch (error) {
-        console.error("Failed to fetch data:", error);
-        return []; // Return an empty array if fetching fails
-    }
-}
-
-// Function to shuffle an array (Fisher-Yates shuffle algorithm)
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-}
-
-// Function to send the next question with an image and clue
-async function sendNextQuestion(conn, m) {
-    if (Object.keys(players).length < 2) {
-        // End game if less than 2 players remain
-        let winner = Object.keys(players)[0];
-        let winnerName = global.db.data.users[winner].name;
-        await conn.reply(m.chat, `*Game Over!*\n\n*Winner:* ${winnerName}`, m);
-        gameStarted = false;
-        return;
+    // Function to fetch data from GitHub raw
+    async function fetchData() {
+        try {
+            let response = await axios.get('https://raw.githubusercontent.com/Aurtherle/Games/main/.github/workflows/guessanime.json');
+            return response.data;
+        } catch (error) {
+            console.error("Failed to fetch data:", error);
+            return [];
+        }
     }
 
-    if (currentItemIndex < shuffledData.length) {
-        currentItem = shuffledData[currentItemIndex];
-        let caption = `*Hint:*`; // Caption for the image
-        await conn.sendFile(m.chat, currentItem.img, 'image.jpg', caption, m); // Send the image with the caption
-
-        // Reset answered flag for the new question
-        answered = false;
-
-        // Schedule timeout for the current item
-        setTimeout(() => {
-            // If no correct answer is provided within the timeout, send the next question
-            if (!answered) {
-                currentItemIndex++;
-                sendNextQuestion(conn, m);
-            }
-        }, 8000);
-    } else {
-        await conn.reply(m.chat, `No more questions available.`, m);
-        gameStarted = false;
+    // Function to shuffle an array (Fisher-Yates shuffle algorithm)
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
     }
-}
 
-// Command to join the game
-let joinHandler = async (m, { conn }) => {
-    let user = m.sender;
-    if (!gameStarted) {
-        if (!players[user]) {
-            players[user] = { hearts: 5 }; // Give player 5 hearts
-            let userName = global.db.data.users[user].name;
-            await conn.reply(m.chat, `${userName} has joined the game!`, m);
+    // Function to send the game rules and how to join
+    async function sendGameRules() {
+        let rulesMsg = `*Welcome to the Guess the Anime Character game!*\n\n`;
+        rulesMsg += `*Rules:*\n`;
+        rulesMsg += `- Use the command *join* to join the game.\n`;
+        rulesMsg += `- Each player starts with 5 hearts.\n`;
+        rulesMsg += `- Answer the name of the character shown in the image correctly to earn 1 point (heart).\n`;
+        rulesMsg += `- Use the command *deduct @player* to deduct 1 heart from another player once per round.\n`;
+        rulesMsg += `- The game will proceed with each round showing a new anime character image.\n`;
+        rulesMsg += `- The player who loses all their hearts gets eliminated each round until one player remains.\n\n`;
+        rulesMsg += `*Maximum Players:* ${gameData.maxPlayers}\n`;
+        rulesMsg += `*Minimum Players:* ${gameData.minPlayers}\n\n`;
+        rulesMsg += `*Let the game begin!* Use *start* to start the game when everyone has joined.`;
+
+        await conn.reply(m.chat, rulesMsg, m);
+    }
+
+    // Function to handle players joining the game
+    async function handleJoin(playerId, playerName) {
+        if (!gameData.players[playerId] && Object.keys(gameData.players).length < gameData.maxPlayers) {
+            gameData.players[playerId] = {
+                name: playerName,
+                hearts: 5,
+                points: 0,
+            };
+            await conn.reply(m.chat, `*${playerName}* has joined the game with 5 hearts!`, m);
         } else {
-            await conn.reply(m.chat, `You have already joined the game!`, m);
+            await conn.reply(m.chat, `*${playerName}* has already joined the game or the game is full.`, m);
         }
-    } else {
-        await conn.reply(m.chat, `Game is already in progress!`, m);
     }
-};
 
-// Command to start the game
-let startHandler = async (m, { conn }) => {
-    if (!gameStarted) {
-        gameStarted = true;
-        currentItemIndex = 0;
-        shuffledData = shuffleArray(await fetchData());
-        await conn.reply(m.chat, `*Game has started!*`, m);
-        sendNextQuestion(conn, m);
-    } else {
-        await conn.reply(m.chat, `Game is already in progress!`, m);
-    }
-};
-
-// Command to end the game
-let endHandler = async (m, { conn }) => {
-    if (gameStarted) {
-        gameStarted = false;
-        players = {};
-        await conn.reply(m.chat, `*Game has been ended by the admin.*`, m);
-    } else {
-        await conn.reply(m.chat, `No game is currently in progress!`, m);
-    }
-};
-
-// Function to normalize a string (remove whitespace, convert to lowercase, etc.)
-function normalize(str) {
-    return str.replace(/\s/g, '').toLowerCase(); // Remove whitespace and convert to lowercase
-}
-
-// Function to update and display hearts status
-async function updateHeartsStatus(conn, m) {
-    let statusMsg = "*Hearts Status:*\n\n";
-    Object.entries(players).forEach(([userId, player]) => {
-        let user = global.db.data.users[userId];
-        if (user) {
-            let { name } = user;
-            statusMsg += `*${name}:* ${player.hearts} hearts\n`;
+    // Function to start the game
+    async function startGame() {
+        if (Object.keys(gameData.players).length < gameData.minPlayers) {
+            await conn.reply(m.chat, `Not enough players to start the game. Minimum players required: ${gameData.minPlayers}`, m);
+            return;
         }
-    });
-    await conn.reply(m.chat, statusMsg, m);
-}
 
-// Function to handle answers and heart deduction
-let answerHandler = async (m, { conn }) => {
-    let user = m.sender;
-    let message = m.text.trim();
+        gameData.active = true;
+        gameData.currentRound = 1;
+        let data = await fetchData();
+        gameData.images = shuffleArray(data);
+        gameData.playersOrder = Object.keys(gameData.players);
+        gameData.playersOrderIndex = 0;
 
-    if (gameStarted && !answered && currentItem && normalize(currentItem.name) === normalize(message.split(" ")[0])) {
-        let targetUser = m.message.extendedTextMessage && m.message.extendedTextMessage.contextInfo.mentionedJid[0];
-        if (targetUser && players[targetUser]) {
-            players[targetUser].hearts -= 1;
-            if (players[targetUser].hearts <= 0) {
-                delete players[targetUser]; // Eliminate player if hearts are 0
-                let targetName = global.db.data.users[targetUser].name;
-                await conn.reply(m.chat, `${targetName} has been eliminated!`, m);
+        await sendNextImage();
+    }
+
+    // Function to send the next image and handle game flow
+    async function sendNextImage() {
+        if (gameData.currentRound > 1) {
+            await conn.reply(m.chat, `*Round ${gameData.currentRound} - Next Image:*`, m);
+        } else {
+            await conn.reply(m.chat, `*Game Started!* Round ${gameData.currentRound} - First Image:`, m);
+        }
+
+        gameData.currentImage = gameData.images.pop();
+        await conn.sendFile(m.chat, gameData.currentImage.img, 'image.jpg', `*Who is this anime character?*`, m);
+
+        gameData.answered = false;
+        setTimeout(() => {
+            if (!gameData.answered) {
+                handleTimeout();
+            }
+        }, gameData.timeout);
+    }
+
+    // Function to handle timeout for current image question
+    async function handleTimeout() {
+        await conn.reply(m.chat, `Time's up! The correct answer was *${gameData.currentImage.name}*`, m);
+        gameData.currentRound++;
+
+        if (Object.keys(gameData.players).length === 1) {
+            endGame();
+            return;
+        }
+
+        if (gameData.images.length > 0) {
+            await sendNextImage();
+        } else {
+            calculateResult();
+        }
+    }
+
+    // Function to handle player responses
+    handler.all = async function (m) {
+        let playerId = m.sender;
+        let playerName = m.sender;
+
+        if (!gameData.active) return;
+
+        let message = m.text.trim();
+
+        if (!gameData.answered && gameData.currentImage && normalize(gameData.currentImage.name) === normalize(message)) {
+            gameData.players[playerId].points++;
+            gameData.answered = true;
+
+            await conn.reply(m.chat, `*Correct answer!* +1 heart for *${gameData.players[playerId].name}*`, m);
+
+            if (gameData.images.length > 0) {
+                setTimeout(() => sendNextImage(), 2000);
+            } else {
+                calculateResult();
             }
         }
+    };
 
-        // Send hearts status update
-        await updateHeartsStatus(conn, m);
+    // Function to handle deduction of hearts from another player
+    handler.command = /^deduct$/i;
+    handler.deduct = async function (m, { args }) {
+        if (!gameData.active) return;
 
-        // If user's message matches the name (answer) associated with the current image
-        answered = true; // Mark the question as answered
-        currentItemIndex++; // Move to the next question
-        setTimeout(() => sendNextQuestion(conn, m), 2000); // Send the next question with a 2-second delay
+        let playerId = m.sender;
+        let playerName = m.sender;
+        let targetPlayer = args[0].replace('@', '');
+
+        if (!gameData.players[targetPlayer]) {
+            await conn.reply(m.chat, `Player not found or cannot be deducted from.`, m);
+            return;
+        }
+
+        if (gameData.players[playerId].hearts <= 0) {
+            await conn.reply(m.chat, `You don't have enough hearts to deduct from another player.`, m);
+            return;
+        }
+
+        gameData.players[playerId].hearts--;
+        gameData.players[targetPlayer].hearts++;
+
+        await conn.reply(m.chat, `*${gameData.players[playerId].name}* has deducted 1 heart from *${gameData.players[targetPlayer].name}*`, m);
+
+        calculateResult();
+    };
+
+    // Function to calculate and send the current game result
+    async function calculateResult() {
+        let resultMsg = `*Current Round ${gameData.currentRound} Result:*\n\n`;
+        let players = Object.keys(gameData.players);
+
+        players.forEach(playerId => {
+            let player = gameData.players[playerId];
+            resultMsg += `*${player.name}* - Hearts: ${player.hearts} | Points: ${player.points}\n`;
+        });
+
+        await conn.reply(m.chat, resultMsg, m);
+
+        // Check for elimination
+        let remainingPlayers = players.filter(playerId => gameData.players[playerId].hearts > 0);
+
+        if (remainingPlayers.length === 1) {
+            await conn.reply(m.chat, `Congratulations! *${gameData.players[remainingPlayers[0]].name}* has won the game!`, m);
+            endGame();
+        } else {
+            if (gameData.images.length > 0) {
+                setTimeout(() => sendNextImage(), 2000);
+            } else {
+                calculateResult();
+            }
+        }
     }
-};
 
-// Main handler
-let mainHandler = async (m, context) => {
-    let { conn, args, command } = context;
+    // Function to end the game
+    async function endGame() {
+        gameData.active = false;
+        gameData.players = {};
+        gameData.currentRound = 0;
+        gameData.currentImage = null;
+        gameData.answered = false;
+        gameData.images = [];
+        gameData.playersOrder = [];
+        gameData.playersOrderIndex = 0;
 
-    if (command === 'join') {
-        await joinHandler(m, context);
-    } else if (command === 'start') {
-        await startHandler(m, context);
-    } else if (command === 'end') {
-        await endHandler(m, context);
-    } else {
-        await answerHandler(m, context);
+        await conn.reply(m.chat, `The game has ended. Use *start* to begin a new game.`, m);
     }
-};
 
-mainHandler.command = /^(heart|join|start|end)$/i;
+    // Function to normalize a string (remove whitespace, convert to lowercase, etc.)
+    function normalize(str) {
+        return str.replace(/\s/g, '').toLowerCase();
+    }
 
-export default mainHandler;
+    // Command handlers
+    handler.command = /^(start|join|end)$/i;
+    handler.start = startGame;
+
+    handler.join = async (m) => {
+        let playerId = m.sender;
+        let playerName = m.sender;
+
+        if (!gameData.active && Object.keys(gameData.players).length < gameData.maxPlayers) {
+            await handleJoin(playerId, playerName);
+        } else {
+            await conn.reply(m.chat, `The game is currently active or has reached the maximum number of players.`, m);
+        }
+    };
+
+    handler.end = async (m) => {
+        if (gameData.active) {
+            endGame();
+        } else {
+            await conn.reply(m.chat, `No game is currently active.`, m);
+        }
+    };
+
+    // Send game rules when the game is started for the first time
