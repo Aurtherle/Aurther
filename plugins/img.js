@@ -2,13 +2,13 @@ import axios from 'axios';
 
 let handler = async (m, { conn, args }) => {
     let chat = global.db.data.chats[m.chat];
-    let count = parseInt(args[0]) || 10; // Default to 10 questions if count is not provided
     let data = await fetchData(); // Fetch data from GitHub raw
     let shuffledData = shuffleArray(data); // Shuffle the data array
+    let players = {}; // Object to track players and their hearts
     let currentItemIndex = 0; // Index of the current item being processed
     let currentItem; // Current item being processed
     let answered = false; // Flag to track if the question has been answered
-    let points = {}; // Object to track points for each user
+    let gameStarted = false; // Flag to track if the game has started
 
     // Function to fetch data from GitHub raw
     async function fetchData() {
@@ -32,15 +32,15 @@ let handler = async (m, { conn, args }) => {
 
     // Function to generate leaderboard message
     async function generateLeaderboard() {
-        let leaderboard = Object.entries(points).sort((a, b) => b[1] - a[1]);
+        let leaderboard = Object.entries(players).sort((a, b) => b[1].hearts - a[1].hearts);
         let leaderboardMsg = "*❃ ──────⊰ ❀ ⊱────── ❃*\n\n *المشاركين :*\n\n";
         leaderboard.forEach((entry, index) => {
-            let [userId, points] = entry;
+            let [userId, player] = entry;
             let user = global.db.data.users[userId];
             if (!user) return;
             let { name } = user;
             let emoji = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "";
-            leaderboardMsg += `◍ *${name} : ${points}* ${emoji}\n`;
+            leaderboardMsg += `◍ *${name} : ${player.hearts}* ❤️ ${emoji}\n`;
         });
         leaderboardMsg += "\n*❃ ──────⊰ ❀ ⊱────── ❃*";
         return leaderboardMsg;
@@ -48,7 +48,15 @@ let handler = async (m, { conn, args }) => {
 
     // Function to send the next question with an image and clue
     async function sendNextQuestion() {
-        if (currentItemIndex < shuffledData.length && count > 0) {
+        if (Object.keys(players).length < 2) {
+            // End game if less than 2 players remain
+            let winner = Object.keys(players)[0];
+            let winnerName = global.db.data.users[winner].name;
+            await conn.reply(m.chat, `*Game Over!*\n\n*Winner:* ${winnerName}`, m);
+            return;
+        }
+
+        if (currentItemIndex < shuffledData.length) {
             currentItem = shuffledData[currentItemIndex];
             let caption = `*Hint:*`; // Caption for the image
             await conn.sendFile(m.chat, currentItem.img, 'image.jpg', caption, m); // Send the image with the caption
@@ -64,7 +72,6 @@ let handler = async (m, { conn, args }) => {
                     sendNextQuestion();
                 }
             }, 8000);
-            count--; // Decrease the count
         } else {
             // When all questions are sent or the count limit is reached, generate and send leaderboard
             let leaderboardMsg = await generateLeaderboard();
@@ -76,19 +83,33 @@ let handler = async (m, { conn, args }) => {
     handler.all = async function (m) {
         let user = m.sender;
         let message = m.text.trim();
-        if (!answered && currentItem && normalize(currentItem.name) === normalize(message)) {
+        
+        if (!gameStarted && message.toLowerCase() === 'join') {
+            if (!players[user]) {
+                players[user] = { hearts: 5 }; // Give player 5 hearts
+                let userName = global.db.data.users[user].name;
+                await conn.reply(m.chat, `${userName} has joined the game!`, m);
+            } else {
+                await conn.reply(m.chat, `You have already joined the game!`, m);
+            }
+        }
+
+        if (gameStarted && !answered && currentItem && normalize(currentItem.name) === normalize(message.split(" ")[0])) {
+            let targetUser = m.message.extendedTextMessage && m.message.extendedTextMessage.contextInfo.mentionedJid[0];
+            if (targetUser && players[targetUser]) {
+                players[targetUser].hearts -= 1;
+                if (players[targetUser].hearts <= 0) {
+                    delete players[targetUser]; // Eliminate player if hearts are 0
+                    let targetName = global.db.data.users[targetUser].name;
+                    await conn.reply(m.chat, `${targetName} has been eliminated!`, m);
+                }
+            }
+
             // If user's message matches the name (answer) associated with the current image
-            points[user] = (points[user] || 0) + 1; // Increase points for the user
             answered = true; // Mark the question as answered
             await conn.reply(m.chat, ".", m); // Send a confirmation message
             currentItemIndex++; // Move to the next question
-            if (currentItemIndex < shuffledData.length && count > 0) {
-                setTimeout(() => sendNextQuestion(), 2000); // Send the next question with a 2-second delay
-            } else {
-                // If all questions have been sent, generate and send leaderboard
-                let leaderboardMsg = await generateLeaderboard();
-                await conn.reply(m.chat, leaderboardMsg, m);
-            }
+            setTimeout(() => sendNextQuestion(), 2000); // Send the next question with a 2-second delay
         }
     };
 
@@ -97,12 +118,22 @@ let handler = async (m, { conn, args }) => {
         return str.replace(/\s/g, '').toLowerCase(); // Remove whitespace and convert to lowercase
     }
 
-    // Start sending questions with images and associated names
-    sendNextQuestion();
+    // Command to start the game
+    handler.command = async function (m) {
+        if (m.text.toLowerCase() === 'start') {
+            if (!gameStarted) {
+                gameStarted = true;
+                await conn.reply(m.chat, `*Game has started!*`, m);
+                sendNextQuestion();
+            } else {
+                await conn.reply(m.chat, `Game is already in progress!`, m);
+            }
+        }
+    };
 
     return true; // Message handled
 };
 
-handler.command = /^(صور)$/i;
+handler.command = /^(heart)$/i;
 
 export default handler;
