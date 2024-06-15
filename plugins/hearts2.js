@@ -145,7 +145,7 @@ let handler = async (m, { conn, command, args }) => {
         async function handlePlayerAnswer(user, message, conn, m, chat) {
             if (!chat.roundStarted) return;
 
-            let answer = message.trim().toLowerCase().replace(/\s/g, ''); // Normalize the answer
+            let answer = message.trim().toLowerCase(); // Normalize the answer
             console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
 
             if (answer === chat.currentAnswer) {
