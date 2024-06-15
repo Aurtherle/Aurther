@@ -118,6 +118,6 @@ let handler = async (m, { conn, args }) => {
     return true; // Message handled
 };
 
-handler.command = /^(كتابة|كت)$/i;
+handler.command = /^(صور)$/i;
 
 export default handler;
