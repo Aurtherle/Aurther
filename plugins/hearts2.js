@@ -17,9 +17,9 @@ let handler = async (m, { conn, command, args }) => {
 
         // Sample data of characters with image URLs and names
         const characters = [
-            { img: 'https://telegra.ph/file/a0a5f819f872e3920adc6.jpg', name: 'nez' },
-            { img: 'https://telegra.ph/file/ff78973403ec1f3bdc5fd.jpg', name: 'med' },
             { img: 'https://telegra.ph/file/9631bfa9255dc1c92d4b8.jpg', name: 'fif' },
+            { img: 'https://telegra.ph/file/ff78973403ec1f3bdc5fd.jpg', name: 'mid' },
+            { img: 'https://telegra.ph/file/a0a5f819f872e3920adc6.jpg', name: 'niz' },
             // Add more objects as needed
         ];
 
@@ -139,6 +139,36 @@ let handler = async (m, { conn, command, args }) => {
                 statusMsg += `${user}: ${chat.players[user].hearts} ${chat.players[user].heartShape}\n`;
             }
             await conn.reply(m.chat, statusMsg.trim(), m);
+        }
+
+        // Function to handle player's answer
+        async function handlePlayerAnswer(user, message, conn, m, chat) {
+            if (!chat.roundStarted) return;
+
+            let answer = message.trim().toLowerCase().replace(/\s/g, ''); // Normalize the answer
+            console.log(`User answer: ${answer}, Expected answer: ${chat.currentAnswer}`);
+
+            if (answer === chat.currentAnswer) {
+                chat.roundStarted = false;
+                if (chat.players[user]) {
+                    chat.players[user].hearts--;
+                    await conn.reply(m.chat, `${user} got it right!`, m);
+                    await conn.reply(m.chat, `Remaining ${chat.players[user].heartShape}: ${chat.players[user].hearts}`, m);
+                    if (chat.players[user].hearts === 0) {
+                        await conn.reply(m.chat, `${user} has been eliminated!`, m);
+                        delete chat.players[user];
+                    }
+                    if (Object.keys(chat.players).length === 1 || Object.values(chat.players).every(player => player.hearts === 0)) {
+                        // Check if only one player is left or all other players are eliminated
+                        let winner = Object.keys(chat.players)[0];
+                        await conn.reply(m.chat, `${winner} is the winner with ${chat.players[winner].hearts} ${chat.players[winner].heartShape}!`, m);
+                        chat.inGame = false;
+                    } else {
+                        console.log('Starting new round after correct answer...');
+                        await startRound(conn, m, chat); // Start a new round
+                    }
+                }
+            }
         }
 
         // Command handler
