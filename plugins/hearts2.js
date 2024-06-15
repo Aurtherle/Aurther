@@ -5,19 +5,20 @@ let handler = async (m, { conn }) => {
     let players = {}; // Object to track players and their hearts
     let photos = [
         {
-            url: 'https://example.com/photo1.jpg',
-            answer: 'Anime 1'
+            url: 'https://telegra.ph/file/ae2912d507d8835e41e9a.jpg',
+            answer: 'moz'
         },
         {
-            url: 'https://example.com/photo2.jpg',
-            answer: 'Anime 2'
+            url: 'https://telegra.ph/file/a0a5f819f872e3920adc6.jpg',
+            answer: 'nez'
         },
         // Add more photos with their answers here
     ];
 
     // Function to start the game
     async function startGame() {
-        await conn.reply(m.chat, 'لعبة تخمين الأنمي ستبدأ قريبًا! انتظر قليلاً للانضمام.', m);
+        chat.gameStatus = 'ongoing'; // Set game status to ongoing
+        await conn.reply(m.chat, 'لعبة تخمين الأنمي ستبدأ الآن!', m);
         await conn.reply(m.chat, 'يمكن للأعضاء الانضمام بإرسال "انضم" في أي وقت.', m);
         setTimeout(sendPhoto, 3000); // Start sending photos after 3 seconds
     }
@@ -43,17 +44,12 @@ let handler = async (m, { conn }) => {
 
     // Command to join the game
     handler.join = async function (m) {
-        if (chat.gameStatus !== 'ongoing') {
-            await conn.reply(m.chat, 'اللعبة لم تبدأ بعد.', m);
-            return;
-        }
-        
         let user = m.sender;
-        if (!players[user]) {
+        if (players[user]) {
+            await conn.reply(m.chat, 'أنت بالفعل في اللعبة.', m);
+        } else {
             players[user] = 5; // Give the player 5 hearts
             await conn.reply(m.chat, 'أنت الآن في اللعبة! لديك 5 قلوب.', m);
-        } else {
-            await conn.reply(m.chat, 'أنت بالفعل في اللعبة.', m);
         }
     };
 
@@ -79,16 +75,14 @@ let handler = async (m, { conn }) => {
         }
     };
 
-    // Start the game upon command trigger
-    handler.command = /^(قلوب|العب|ابدأ)$/i;
+    // Command to start the game
+    handler.command = /^(ابدأ|بداية|قلوب)$/i;
     handler.all = async function (m) {
         if (m.text.match(handler.command)) {
-            if (chat.gameStatus === 'ongoing') {
-                await conn.reply(m.chat, 'اللعبة بالفعل قيد التشغيل.', m);
+            if (chat.gameStatus !== 'ongoing') {
+                await startGame(); // Start the game if not ongoing
             } else {
-                chat.gameStatus = 'ongoing';
-                await conn.reply(m.chat, 'اللعبة قد بدأت!', m);
-                startGame(); // Start the game
+                await conn.reply(m.chat, 'اللعبة بالفعل قيد التشغيل.', m);
             }
         }
     };
