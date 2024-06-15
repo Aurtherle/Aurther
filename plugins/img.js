@@ -105,6 +105,19 @@ function normalize(str) {
     return str.replace(/\s/g, '').toLowerCase(); // Remove whitespace and convert to lowercase
 }
 
+// Function to update and display hearts status
+async function updateHeartsStatus(conn, m) {
+    let statusMsg = "*Hearts Status:*\n\n";
+    Object.entries(players).forEach(([userId, player]) => {
+        let user = global.db.data.users[userId];
+        if (user) {
+            let { name } = user;
+            statusMsg += `*${name}:* ${player.hearts} hearts\n`;
+        }
+    });
+    await conn.reply(m.chat, statusMsg, m);
+}
+
 // Function to handle answers and heart deduction
 let answerHandler = async (m, { conn }) => {
     let user = m.sender;
@@ -121,9 +134,11 @@ let answerHandler = async (m, { conn }) => {
             }
         }
 
+        // Send hearts status update
+        await updateHeartsStatus(conn, m);
+
         // If user's message matches the name (answer) associated with the current image
         answered = true; // Mark the question as answered
-        await conn.reply(m.chat, ".", m); // Send a confirmation message
         currentItemIndex++; // Move to the next question
         setTimeout(() => sendNextQuestion(conn, m), 2000); // Send the next question with a 2-second delay
     }
@@ -139,6 +154,16 @@ let mainHandler = async (m, context) => {
         await startHandler(m, context);
     } else if (command === 'end') {
         await endHandler(m, context);
+    } else if (command === 'heart') {
+        if (!gameStarted) {
+            gameStarted = true;
+            currentItemIndex = 0;
+            shuffledData = shuffleArray(await fetchData());
+            await conn.reply(m.chat, `*Game has started!*`, m);
+            await conn.reply(m.chat, `Players can now join using *#join* command.`, m);
+        } else {
+            await conn.reply(m.chat, `Game is already in progress!`, m);
+        }
     } else {
         await answerHandler(m, context);
     }
