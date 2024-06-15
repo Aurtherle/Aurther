@@ -5,12 +5,12 @@ let handler = async (m, { conn }) => {
     let players = {}; // Object to track players and their hearts
     let photos = [
         {
-            url: 'https://telegra.ph/file/62dc6440302ba4dbb51cd.jpg',
-            answer: 'rar'
+            url: 'https://example.com/photo1.jpg',
+            answer: 'Anime 1'
         },
         {
-            url: 'https://telegra.ph/file/ae2912d507d8835e41e9a.jpg',
-            answer: 'moz'
+            url: 'https://example.com/photo2.jpg',
+            answer: 'Anime 2'
         },
         // Add more photos with their answers here
     ];
@@ -80,7 +80,7 @@ let handler = async (m, { conn }) => {
     };
 
     // Start the game upon command trigger
-    handler.command = /^(بدء|بداية) اللعبة$/i;
+    handler.command = /^(قلوب|العب|ابدأ)$/i;
     handler.all = async function (m) {
         if (m.text.match(handler.command)) {
             if (chat.gameStatus === 'ongoing') {
