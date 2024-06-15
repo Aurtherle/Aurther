@@ -154,16 +154,6 @@ let mainHandler = async (m, context) => {
         await startHandler(m, context);
     } else if (command === 'end') {
         await endHandler(m, context);
-    } else if (command === 'heart') {
-        if (!gameStarted) {
-            gameStarted = true;
-            currentItemIndex = 0;
-            shuffledData = shuffleArray(await fetchData());
-            await conn.reply(m.chat, `*Game has started!*`, m);
-            await conn.reply(m.chat, `Players can now join using *#join* command.`, m);
-        } else {
-            await conn.reply(m.chat, `Game is already in progress!`, m);
-        }
     } else {
         await answerHandler(m, context);
     }
