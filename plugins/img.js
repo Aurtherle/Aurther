@@ -10,6 +10,9 @@ let handler = async (m, { conn, args }) => {
         maxPlayers: 15, // Maximum number of players allowed
         minPlayers: 2, // Minimum number of players required to start the game
         timeout: 15000, // Timeout for answering each image question (15 seconds)
+        images: [], // Array to store shuffled images data
+        playersOrder: [], // Array to store player order for deduction round
+        playersOrderIndex: 0, // Index to track current player for deduction round
     };
 
     // Function to fetch data from GitHub raw
@@ -72,8 +75,7 @@ let handler = async (m, { conn, args }) => {
 
         gameData.active = true;
         gameData.currentRound = 1;
-        let data = await fetchData();
-        gameData.images = shuffleArray(data);
+        gameData.images = shuffleArray(await fetchData());
         gameData.playersOrder = Object.keys(gameData.players);
         gameData.playersOrderIndex = 0;
 
@@ -227,7 +229,7 @@ let handler = async (m, { conn, args }) => {
         }
     };
 
-    handler.end = async (m) => {
+        handler.end = async (m) => {
         if (gameData.active) {
             endGame();
         } else {
@@ -235,4 +237,47 @@ let handler = async (m, { conn, args }) => {
         }
     };
 
+    // Function to handle deduction command
+    handler.command = /^deduct$/i;
+    handler.deduct = async function (m, { args }) {
+        if (!gameData.active) {
+            await conn.reply(m.chat, `No active game to deduct hearts.`, m);
+            return;
+        }
+
+        let playerId = m.sender;
+        let playerName = m.sender;
+
+        if (!gameData.players[playerId]) {
+            await conn.reply(m.chat, `You are not a participant in the game.`, m);
+            return;
+        }
+
+        if (gameData.players[playerId].hearts <= 0) {
+            await conn.reply(m.chat, `You don't have enough hearts to deduct from another player.`, m);
+            return;
+        }
+
+        let targetPlayerId = args[0].replace('@', '');
+        if (!gameData.players[targetPlayerId]) {
+            await conn.reply(m.chat, `Player not found or cannot be deducted from.`, m);
+            return;
+        }
+
+        gameData.players[playerId].hearts--;
+        gameData.players[targetPlayerId].hearts++;
+
+        await conn.reply(m.chat, `*${gameData.players[playerId].name}* has deducted 1 heart from *${gameData.players[targetPlayerId].name}*`, m);
+
+        calculateResult();
+    };
+
     // Send game rules when the game is started for the first time
+    if (!gameData.active) {
+        await sendGameRules();
+    }
+
+    return true; // Message handled
+};
+
+export default handler;
