@@ -33,7 +33,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
 
 handler.help = ['sfull']
 handler.tags = ['sticker']
-handler.command = /^s(tic?ker)?(gif)?(wm)?$/i
+handler.command = ['s','حقوق']
 
 export default handler
 
