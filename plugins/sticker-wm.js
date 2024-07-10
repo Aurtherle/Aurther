@@ -1,27 +1,35 @@
-
 import { addExif } from '../lib/sticker.js'
-let handler = async (m, { conn, text, args }) => {
+
+let handler = async (m, { conn, text }) => {
   if (!m.quoted) throw 'وين الستيكر ؟'
+
   let stiker = false
-       let stick = args.join(" ").split("|");
-       let f = stick[0] !== "" ? stick[0] : packname;
-       let g = typeof stick[1] !== "undefined" ? stick[1] : author;
+  let name = text.trim()
+
   try {
     let mime = m.quoted.mimetype || ''
-    if (!/webp/.test(mime)) throw 'respond to a sticker'
+    if (!/webp/.test(mime)) throw 'يجب أن تكون صورة على شكل ملصق'
+
     let img = await m.quoted.download()
-    if (!img) throw 'Responde to sticker!'
-    stiker = await addExif(img, f, g)
+    if (!img) throw 'رد على الملصق!'
+
+    // Call addExif function to add watermark with the provided name
+    stiker = await addExif(img, name, name)
   } catch (e) {
     console.error(e)
     if (Buffer.isBuffer(e)) stiker = e
   } finally {
-    if (stiker) conn.sendFile(m.chat, stiker, 'wm.webp', '', m, null, rpl)
-     else throw 'conversion failed'
+    if (stiker) {
+      // Send the modified sticker with watermark
+      conn.sendFile(m.chat, stiker, 'wm.webp', '', m, null, null)
+    } else {
+      throw 'فشل التحويل'
+    }
   }
 }
-handler.help = ['take <name>|<author>']
+
+handler.help = ['take <name>']
 handler.tags = ['sticker']
-handler.command = ['حقوق', 'wm'] 
+handler.command = ['حقوق', 'wm']
 
 export default handler
