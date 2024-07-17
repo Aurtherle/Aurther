@@ -3,14 +3,17 @@ import fg from 'api-dylux'
 // Handler function to fetch and display Instagram profile details
 let handler = async (m, { conn, args, text, usedPrefix, command }) => {
   // Check if a username is provided
-  if (!args[0])
+  if (!args[0]) {
     throw `✳️ Enter the Instagram Username\n\n📌Example: ${usedPrefix + command} asli_guru69`
+  }
 
   // Fetch Instagram profile details
   let res;
   try {
     res = await fg.igStalk(args[0])
+    console.log('API response:', res) // Log the API response for debugging
   } catch (error) {
+    console.error('API call error:', error) // Log any errors from the API call
     throw `❌ Failed to fetch Instagram profile: ${error.message}`
   }
 
